@@ -1,16 +1,16 @@
-require 'net/sftp/protocol/01/base'
-require 'net/sftp/protocol/02/base'
-require 'net/sftp/protocol/03/base'
-require 'net/sftp/protocol/04/base'
-require 'net/sftp/protocol/05/base'
-require 'net/sftp/protocol/06/base'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/01/base"
+require "net/sftp/protocol/02/base"
+require "net/sftp/protocol/03/base"
+require "net/sftp/protocol/04/base"
+require "net/sftp/protocol/05/base"
+require "net/sftp/protocol/06/base"
 
 module Net; module SFTP
-
   # The Protocol module contains the definitions for all supported SFTP
   # protocol versions.
   module Protocol
-
     # Instantiates and returns a new protocol driver instance for the given
     # protocol version. +session+ must be a valid SFTP session object, and
     # +version+ must be an integer. If an unsupported version is given,
@@ -26,7 +26,5 @@ module Net; module SFTP
       else raise NotImplementedError, "unsupported SFTP version #{version.inspect}"
       end
     end
-
   end
-
 end; end

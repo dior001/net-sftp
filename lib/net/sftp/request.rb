@@ -1,8 +1,9 @@
-require 'net/sftp/constants'
-require 'net/sftp/response'
+# frozen_string_literal: true
+
+require "net/sftp/constants"
+require "net/sftp/response"
 
 module Net; module SFTP
-
   # Encapsulates a single active SFTP request. This is instantiated
   # automatically by the Net::SFTP::Session class when an operation is
   # executed.
@@ -39,8 +40,11 @@ module Net; module SFTP
     # Instantiate a new Request object, serviced by the given +session+, and
     # being of the given +type+. The +id+ is the packet identifier for this
     # request.
-    def initialize(session, type, id, &callback) #:nodoc:
-      @session, @id, @type, @callback = session, id, type, callback
+    def initialize(session, type, id, &callback) # :nodoc:
+      @session = session
+      @id = id
+      @type = type
+      @callback = callback
       @response = nil
       @properties = {}
     end
@@ -73,19 +77,16 @@ module Net; module SFTP
       self
     end
 
-    public # but not "published". Internal use only
-
       # When the server responds to this request, the packet is passed to
       # this method, which parses the packet and builds a Net::SFTP::Response
       # object to encapsulate it. If a #callback has been provided for this
       # request, the callback is invoked with the new response object.
-      def respond_to(packet) #:nodoc:
+      def respond_to(packet) # :nodoc:
         data = session.protocol.parse(packet)
         data[:type] = packet.type
         @response = Response.new(self, data)
 
-        callback.call(@response) if callback
+        callback&.call(@response)
       end
   end
-
 end; end

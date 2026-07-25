@@ -1,4 +1,6 @@
-require 'common'
+# frozen_string_literal: true
+
+require "common"
 
 class ResponseTest < Net::SFTP::TestCase
   def test_code_should_default_to_FX_OK
@@ -8,7 +10,7 @@ class ResponseTest < Net::SFTP::TestCase
 
   def test_brackets_should_symbolize_key
     response = Net::SFTP::Response.new(mock("response"), :handle => "foo")
-    assert_equal "foo", response['handle']
+    assert_equal "foo", response["handle"]
   end
 
   def test_to_s_with_nil_message_should_show_default_message
@@ -33,21 +35,21 @@ class ResponseTest < Net::SFTP::TestCase
 
   def test_ok_should_be_true_when_code_is_FX_OK
     response = Net::SFTP::Response.new(mock("response"))
-    assert_equal true, response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_ok_should_be_false_when_code_is_not_FX_OK
     response = Net::SFTP::Response.new(mock("response"), :code => 14)
-    assert_equal false, response.ok?
+    refute_predicate response, :ok?
   end
 
   def test_eof_should_be_true_when_code_is_FX_EOF
     response = Net::SFTP::Response.new(mock("response"), :code => 1)
-    assert_equal true, response.eof?
+    assert_predicate response, :eof?
   end
 
   def test_eof_should_be_false_when_code_is_not_FX_EOF
     response = Net::SFTP::Response.new(mock("response"), :code => 14)
-    assert_equal false, response.eof?
+    refute_predicate response, :eof?
   end
 end

@@ -1,11 +1,11 @@
-module Net; module SFTP
+# frozen_string_literal: true
 
+module Net; module SFTP
   # The base exception class for the SFTP system.
   class Exception < RuntimeError; end
 
   # A exception class for reporting a non-success result of an operation.
   class StatusException < Net::SFTP::Exception
-
     # The response object that caused the exception.
     attr_reader :response
 
@@ -20,8 +20,13 @@ module Net; module SFTP
 
     # Create a new status exception that reports the given code and
     # description.
-    def initialize(response, text=nil)
-      @response, @text = response, text
+    #
+    # Deliberately does not call +super+: leaving RuntimeError's own message
+    # unset means #message (below) falls back to this class's name as its
+    # prefix, e.g. "Net::SFTP::StatusException open failed (4, \"failure\")".
+    def initialize(response, text = nil) # rubocop:disable Lint/MissingSuper
+      @response = response
+      @text = text
       @code = response.code
       @description = response.message
       @description = Response::MAP[@code] if @description.nil? || @description.empty?
@@ -34,6 +39,5 @@ module Net; module SFTP
       m << " #{text}" if text
       m << " (#{code}, #{description.inspect})"
     end
-
   end
 end; end

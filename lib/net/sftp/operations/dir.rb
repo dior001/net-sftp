@@ -1,7 +1,8 @@
-require 'net/ssh/loggable'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
 
 module Net; module SFTP; module Operations
-
   # A convenience class for working with remote directories. It provides methods
   # for searching and enumerating directory entries, similarly to the standard
   # ::Dir class.
@@ -16,6 +17,10 @@ module Net; module SFTP; module Operations
   #     puts entry.name
   #   end
   class Dir
+    # The special "current directory" and "parent directory" entries that
+    # every SFTP directory listing includes, and which #glob always skips.
+    RELATIVE_ENTRY_NAMES = %w(. ..).freeze
+
     # The SFTP session object that drives this directory factory.
     attr_reader :sftp
 
@@ -27,12 +32,12 @@ module Net; module SFTP; module Operations
     # Calls the block once for each entry in the named directory on the
     # remote server. Yields a Name object to the block, rather than merely
     # the name of the entry.
-    def foreach(path)
+    def foreach(path, &)
       handle = sftp.opendir!(path)
-      while entries = sftp.readdir!(handle)
-        entries.each { |entry| yield entry }
+      while (entries = sftp.readdir!(handle))
+        entries.each(&)
       end
-      return nil
+      nil
     ensure
       sftp.close!(handle) if handle
     end
@@ -42,7 +47,7 @@ module Net; module SFTP; module Operations
     def entries(path)
       results = []
       foreach(path) { |entry| results << entry }
-      return results
+      results
     end
 
     # Works as ::Dir.glob, matching (possibly recursively) all directory
@@ -55,18 +60,18 @@ module Net; module SFTP; module Operations
     # same level of alacrity that ::Dir.glob does; it will work best for
     # shallow directory hierarchies with relatively few directories, though
     # it should be able to handle modest numbers of files in each directory.
-    def glob(path, pattern, flags=0)
+    def glob(path, pattern, flags = 0)
       flags |= ::File::FNM_PATHNAME
-      path = path.chop if path.end_with?('/') && path != '/'
+      path = path.chop if path.end_with?("/") && path != "/"
 
       results = [] unless block_given?
-      queue = entries(path).reject { |e| %w(. ..).include?(e.name) }
+      queue = entries(path).reject { |e| RELATIVE_ENTRY_NAMES.include?(e.name) }
       while queue.any?
         entry = queue.shift
 
-        if entry.directory? && !%w(. ..).include?(::File.basename(entry.name))
+        if entry.directory? && !RELATIVE_ENTRY_NAMES.include?(::File.basename(entry.name))
           queue += entries("#{path}/#{entry.name}").map do |e|
-            e.name.replace("#{entry.name}/#{e.name}")
+            e.name = "#{entry.name}/#{e.name}"
             e
           end
         end
@@ -80,7 +85,7 @@ module Net; module SFTP; module Operations
         end
       end
 
-      return results unless block_given?
+      results unless block_given?
     end
 
     # Identical to calling #glob with a +flags+ parameter of 0 and no block.
@@ -89,5 +94,4 @@ module Net; module SFTP; module Operations
       glob(path, pattern, 0)
     end
   end
-
 end; end; end

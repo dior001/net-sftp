@@ -1,7 +1,8 @@
-require 'net/sftp/protocol/01/attributes'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/01/attributes"
 
 module Net; module SFTP; module Protocol; module V04
-
   # A class representing the attributes of a file or directory on the server.
   # It may be used to specify new attributes, or to query existing attributes.
   # This particular class is specific to versions 4 and 5 of the SFTP
@@ -30,22 +31,21 @@ module Net; module SFTP; module Protocol; module V04
   # above attributes are exposed as methods (though not all will be set with
   # non-nil values from the server).
   class Attributes < V01::Attributes
-
     F_ACCESSTIME        = 0x00000008
     F_CREATETIME        = 0x00000010
     F_MODIFYTIME        = 0x00000020
     F_ACL               = 0x00000040
     F_OWNERGROUP        = 0x00000080
     F_SUBSECOND_TIMES   = 0x00000100
-    
+
     # A simple struct for representing a single entry in an Access Control
     # List. (See Net::SFTP::Constants::ACE)
     ACL = Struct.new(:type, :flag, :mask, :who)
 
-    class <<self
+    class << self
       # The list of supported elements in the attributes structure as defined
       # by v4 of the sftp protocol.
-      def elements #:nodoc:
+      def elements # :nodoc:
         @elements ||= [
           [:type,                :byte,    0],
           [:size,                :int64,   V01::Attributes::F_SIZE],
@@ -121,7 +121,7 @@ module Net; module SFTP; module Protocol; module V04
     #
     # All of them default to +nil+ if omitted, except for +type+, which defaults
     # to T_REGULAR.
-    def initialize(attributes={})
+    def initialize(attributes = {})
       super
       attributes[:type] ||= T_REGULAR
     end
@@ -146,7 +146,5 @@ module Net; module SFTP; module Protocol; module V04
         end
         buffer.write_string(acl_buf.to_s)
       end
-
   end
-
-end ; end ; end ; end
+end; end; end; end

@@ -2,34 +2,62 @@ name: CI
 on: [push, pull_request]
 jobs:
   test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.flaky }}
     strategy:
+      fail-fast: false
       matrix:
-        ruby-version: ["2.5", "2.6", "2.7", "3.0", "3.1", "truffleruby-22", "truffleruby-21"]
+        ruby-version: ["3.1", "3.2", "3.3", "3.4", "4.0.6", "truffleruby"]
         flaky: [false]
         include:
           - ruby-version: "ruby-head"
             flaky: true
-          - ruby-version: "jruby-9.2"
-            flaky: true
-          - ruby-version: "jruby-9.3"
+          - ruby-version: "jruby"
             flaky: true
           - ruby-version: "jruby-head"
             flaky: true
           - ruby-version: "truffleruby-head"
             flaky: true
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby-version }}
+          bundler-cache: true
 
-      - name: Bundle install
-        run: |
-          gem install bundler
-          bundle install
-      - name: Run Tests
+      - name: Run tests
+        env:
+          COVERAGE: "1"
         run: bundle exec rake test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0.6"
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0.6"
+          bundler-cache: true
+
+      - name: Run bundler-audit
+        run: |
+          bundle exec bundle-audit update
+          bundle exec bundle-audit check

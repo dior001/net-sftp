@@ -1,9 +1,10 @@
-require 'net/sftp/protocol/03/base'
-require 'net/sftp/protocol/04/attributes'
-require 'net/sftp/protocol/04/name'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/03/base"
+require "net/sftp/protocol/04/attributes"
+require "net/sftp/protocol/04/name"
 
 module Net; module SFTP; module Protocol; module V04
-
   # Wraps the low-level SFTP calls for version 4 of the SFTP protocol. Also
   # implements the updated FXP_NAME packet parsing as mandated by v4 of the
   # protocol.
@@ -15,7 +16,6 @@ module Net; module SFTP; module Protocol; module V04
   # You will almost certainly never need to use this driver directly. Please
   # see Net::SFTP::Session for the recommended interface.
   class Base < V03::Base
-
     # Returns the protocol version implemented by this driver. (4, in this
     # case)
     def version
@@ -42,7 +42,7 @@ module Net; module SFTP; module Protocol; module V04
     # F_ACCESSTIME | F_CREATETIME | F_MODIFYTIME | F_ACL | F_OWNERGROUP |
     # F_SUBSECOND_TIMES | F_EXTENDED (see Net::SFTP::Protocol::V04::Attributes
     # for those constants).
-    def stat(path, flags=nil)
+    def stat(path, flags = nil)
       send_request(FXP_STAT, :string, path, :long, flags || DEFAULT_FLAGS)
     end
 
@@ -51,7 +51,7 @@ module Net; module SFTP; module Protocol; module V04
     # F_ACCESSTIME | F_CREATETIME | F_MODIFYTIME | F_ACL | F_OWNERGROUP |
     # F_SUBSECOND_TIMES | F_EXTENDED (see Net::SFTP::Protocol::V04::Attributes
     # for those constants).
-    def lstat(path, flags=nil)
+    def lstat(path, flags = nil)
       send_request(FXP_LSTAT, :string, path, :long, flags || DEFAULT_FLAGS)
     end
 
@@ -60,7 +60,7 @@ module Net; module SFTP; module Protocol; module V04
     # F_ACCESSTIME | F_CREATETIME | F_MODIFYTIME | F_ACL | F_OWNERGROUP |
     # F_SUBSECOND_TIMES | F_EXTENDED (see Net::SFTP::Protocol::V04::Attributes
     # for those constants).
-    def fstat(handle, flags=nil)
+    def fstat(handle, flags = nil)
       send_request(FXP_FSTAT, :string, handle, :long, flags || DEFAULT_FLAGS)
     end
 
@@ -90,5 +90,4 @@ module Net; module SFTP; module Protocol; module V04
         V04::Name
       end
   end
-
 end; end; end; end

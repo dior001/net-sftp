@@ -1,15 +1,16 @@
-require 'net/ssh'
-require 'net/sftp/constants'
-require 'net/sftp/errors'
-require 'net/sftp/protocol'
-require 'net/sftp/request'
-require 'net/sftp/operations/dir'
-require 'net/sftp/operations/upload'
-require 'net/sftp/operations/download'
-require 'net/sftp/operations/file_factory'
+# frozen_string_literal: true
+
+require "net/ssh"
+require "net/sftp/constants"
+require "net/sftp/errors"
+require "net/sftp/protocol"
+require "net/sftp/request"
+require "net/sftp/operations/dir"
+require "net/sftp/operations/upload"
+require "net/sftp/operations/download"
+require "net/sftp/operations/file_factory"
 
 module Net; module SFTP
-
   # The Session class encapsulates a single SFTP channel on a Net::SSH
   # connection. Instances of this class are what most applications will
   # interact with most, as it provides access to both low-level (mkdir,
@@ -75,7 +76,7 @@ module Net; module SFTP
     #
     #   sftp = Net::SFTP::Session.new(ssh)
     #   sftp.loop { sftp.opening? }
-    def initialize(session, version = nil, &block)
+    def initialize(session, version = nil, &)
       @session    = session
       @version    = version
       @input      = Net::SSH::Buffer.new
@@ -83,10 +84,8 @@ module Net; module SFTP
       @state      = :closed
       @pending_requests = {}
 
-      connect(&block)
+      connect(&)
     end
-
-    public # high-level SFTP operations
 
       # Initiates an upload from +local+ to +remote+, asynchronously. This
       # method will return a new Net::SFTP::Operations::Upload instance, and requires
@@ -96,13 +95,13 @@ module Net; module SFTP
       #
       #   uploader = sftp.upload("/local/path", "/remote/path")
       #   uploader.wait
-      def upload(local, remote = File.basename(local), options={}, &block)
-        Operations::Upload.new(self, local, remote, options, &block)
+      def upload(local, remote = File.basename(local), options = {}, &)
+        Operations::Upload.new(self, local, remote, options, &)
       end
 
       # Identical to #upload, but blocks until the upload is complete.
-      def upload!(local, remote = File.basename(local), options={}, &block)
-        upload(local, remote, options, &block).wait
+      def upload!(local, remote = File.basename(local), options = {}, &)
+        upload(local, remote, options, &).wait
       end
 
       # Initiates a download from +remote+ to +local+, asynchronously. This
@@ -113,18 +112,18 @@ module Net; module SFTP
       #
       #   download = sftp.download("/remote/path", "/local/path")
       #   download.wait
-      def download(remote, local, options={}, &block)
-        Operations::Download.new(self, local, remote, options, &block)
+      def download(remote, local, options = {}, &)
+        Operations::Download.new(self, local, remote, options, &)
       end
 
       # Identical to #download, but blocks until the download is complete.
       # If +local+ is omitted, downloads the file to an in-memory buffer
       # and returns the result as a string; otherwise, returns the
       # Net::SFTP::Operations::Download instance.
-      def download!(remote, local=nil, options={}, &block)
-        require 'stringio' unless defined?(StringIO)
+      def download!(remote, local = nil, options = {}, &)
+        require "stringio" unless defined?(StringIO)
         destination = local || StringIO.new
-        result = download(remote, destination, options, &block).wait
+        result = download(remote, destination, options, &).wait
         local ? result : destination.string
       end
 
@@ -156,8 +155,6 @@ module Net; module SFTP
         @dir ||= Operations::Dir.new(self)
       end
 
-    public # low-level SFTP operations
-
       # :call-seq:
       #   open(path, flags="r", options={}) -> request
       #   open(path, flags="r", options={}) { |response| ... } -> request
@@ -180,8 +177,8 @@ module Net; module SFTP
       #     sftp.close(response[:handle])
       #   end
       #   sftp.loop
-      def open(path, flags="r", options={}, &callback)
-        request :open, path, flags, options, &callback
+      def open(path, flags = "r", options = {}, &)
+        request(:open, path, flags, options, &)
       end
 
       # Identical to #open, but blocks until the server responds. It will raise
@@ -189,8 +186,8 @@ module Net; module SFTP
       # return the handle of the newly opened file.
       #
       #   handle = sftp.open!("/path/to/file")
-      def open!(path, flags="r", options={}, &callback)
-        wait_for(open(path, flags, options, &callback), :handle)
+      def open!(path, flags = "r", options = {}, &)
+        wait_for(open(path, flags, options, &), :handle) # rubocop:disable Security/Open -- this is Session#open (the SFTP OPEN operation below), not Kernel#open
       end
 
       # :call-seq:
@@ -206,8 +203,8 @@ module Net; module SFTP
       #     sftp.close(response[:handle])
       #   end
       #   sftp.loop
-      def close(handle, &callback)
-        request :close, handle, &callback
+      def close(handle, &)
+        request(:close, handle, &)
       end
 
       # Identical to #close, but blocks until the server responds. It will
@@ -215,8 +212,8 @@ module Net; module SFTP
       # it returns the Response object for this request.
       #
       #   sftp.close!(handle)
-      def close!(handle, &callback)
-        wait_for(close(handle, &callback))
+      def close!(handle, &)
+        wait_for(close(handle, &))
       end
 
       # :call-seq:
@@ -245,8 +242,8 @@ module Net; module SFTP
       #
       # To read an entire file will usually require multiple calls to #read,
       # unless you know in advance how large the file is.
-      def read(handle, offset, length, &callback)
-        request :read, handle, offset, length, &callback
+      def read(handle, offset, length, &)
+        request(:read, handle, offset, length, &)
       end
 
       # Identical to #read, but blocks until the server responds. It will raise
@@ -255,8 +252,8 @@ module Net; module SFTP
       # was read, as a String.
       #
       #   data = sftp.read!(handle, 0, 1024)
-      def read!(handle, offset, length, &callback)
-        wait_for(read(handle, offset, length, &callback), :data)
+      def read!(handle, offset, length, &)
+        wait_for(read(handle, offset, length, &), :data)
       end
 
       # :call-seq:
@@ -271,8 +268,8 @@ module Net; module SFTP
       #
       #   request = sftp.write(handle, 0, "hello, world!\n")
       #   request.wait
-      def write(handle, offset, data, &callback)
-        request :write, handle, offset, data, &callback
+      def write(handle, offset, data, &)
+        request(:write, handle, offset, data, &)
       end
 
       # Identical to #write, but blocks until the server responds. It will raise
@@ -280,8 +277,8 @@ module Net; module SFTP
       # was reached. Otherwise, it returns the Response object for this request.
       #
       #   sftp.write!(handle, 0, "hello, world!\n")
-      def write!(handle, offset, data, &callback)
-        wait_for(write(handle, offset, data, &callback))
+      def write!(handle, offset, data, &)
+        wait_for(write(handle, offset, data, &))
       end
 
       # :call-seq:
@@ -309,8 +306,8 @@ module Net; module SFTP
       #     puts "permissions: %04o" % response[:attrs].permissions
       #   end
       #   request.wait
-      def lstat(path, flags=nil, &callback)
-        request :lstat, path, flags, &callback
+      def lstat(path, flags = nil, &)
+        request(:lstat, path, flags, &)
       end
 
       # Identical to the #lstat method, but blocks until the server responds.
@@ -318,16 +315,16 @@ module Net; module SFTP
       # Otherwise, it will return the attribute object describing the path.
       #
       #   puts sftp.lstat!("/path/to/file").permissions
-      def lstat!(path, flags=nil, &callback)
-        wait_for(lstat(path, flags, &callback), :attrs)
+      def lstat!(path, flags = nil, &)
+        wait_for(lstat(path, flags, &), :attrs)
       end
 
       # The fstat method is identical to the #stat and #lstat methods, with
       # the exception that it takes a +handle+ as the first parameter, such
       # as would be obtained via the #open or #opendir methods. (See the #lstat
       # method for full documentation).
-      def fstat(handle, flags=nil, &callback)
-        request :fstat, handle, flags, &callback
+      def fstat(handle, flags = nil, &)
+        request(:fstat, handle, flags, &)
       end
 
       # Identical to the #fstat method, but blocks until the server responds.
@@ -335,8 +332,8 @@ module Net; module SFTP
       # Otherwise, it will return the attribute object describing the path.
       #
       #   puts sftp.fstat!(handle).permissions
-      def fstat!(handle, flags=nil, &callback)
-        wait_for(fstat(handle, flags, &callback), :attrs)
+      def fstat!(handle, flags = nil, &)
+        wait_for(fstat(handle, flags, &), :attrs)
       end
 
       # :call-seq:
@@ -360,8 +357,8 @@ module Net; module SFTP
       #   request = sftp.setstat("/path/to/file", :permissions => 0644)
       #   request.wait
       #   puts "success: #{request.response.ok?}"
-      def setstat(path, attrs, &callback)
-        request :setstat, path, attrs, &callback
+      def setstat(path, attrs, &)
+        request(:setstat, path, attrs, &)
       end
 
       # Identical to the #setstat method, but blocks until the server responds.
@@ -369,16 +366,16 @@ module Net; module SFTP
       # Otherwise, it will return the Response object for the request.
       #
       #   sftp.setstat!("/path/to/file", :permissions => 0644)
-      def setstat!(path, attrs, &callback)
-        wait_for(setstat(path, attrs, &callback))
+      def setstat!(path, attrs, &)
+        wait_for(setstat(path, attrs, &))
       end
 
       # The fsetstat method is identical to the #setstat method, with the
       # exception that it takes a +handle+ as the first parameter, such as
       # would be obtained via the #open or #opendir methods. (See the
       # #setstat method for full documentation.)
-      def fsetstat(handle, attrs, &callback)
-        request :fsetstat, handle, attrs, &callback
+      def fsetstat(handle, attrs, &)
+        request(:fsetstat, handle, attrs, &)
       end
 
       # Identical to the #fsetstat method, but blocks until the server responds.
@@ -386,8 +383,8 @@ module Net; module SFTP
       # Otherwise, it will return the Response object for the request.
       #
       #   sftp.fsetstat!(handle, :permissions => 0644)
-      def fsetstat!(handle, attrs, &callback)
-        wait_for(fsetstat(handle, attrs, &callback))
+      def fsetstat!(handle, attrs, &)
+        wait_for(fsetstat(handle, attrs, &))
       end
 
       # :call-seq:
@@ -404,8 +401,8 @@ module Net; module SFTP
       #     sftp.close(response[:handle])
       #   end
       #   sftp.loop
-      def opendir(path, &callback)
-        request :opendir, path, &callback
+      def opendir(path, &)
+        request(:opendir, path, &)
       end
 
       # Identical to #opendir, but blocks until the server responds. It will raise
@@ -413,8 +410,8 @@ module Net; module SFTP
       # return a handle to the given path.
       #
       #   handle = sftp.opendir!("/path/to/directory")
-      def opendir!(path, &callback)
-        wait_for(opendir(path, &callback), :handle)
+      def opendir!(path, &)
+        wait_for(opendir(path, &), :handle)
       end
 
       # :call-seq:
@@ -438,8 +435,8 @@ module Net; module SFTP
       # See also Protocol::V01::Name and Protocol::V04::Name for the specific
       # properties of each individual entry (which vary based on the SFTP
       # protocol version in use).
-      def readdir(handle, &callback)
-        request :readdir, handle, &callback
+      def readdir(handle, &)
+        request(:readdir, handle, &)
       end
 
       # Identical to #readdir, but blocks until the server responds. It will raise
@@ -450,8 +447,8 @@ module Net; module SFTP
       #   while (entries = sftp.readdir!(handle)) do
       #     entries.each { |entry| puts(entry.name) }
       #   end
-      def readdir!(handle, &callback)
-        wait_for(readdir(handle, &callback), :names)
+      def readdir!(handle, &)
+        wait_for(readdir(handle, &), :names)
       end
 
       # :call-seq:
@@ -464,8 +461,8 @@ module Net; module SFTP
       # object.
       #
       #   sftp.remove("/path/to/file").wait
-      def remove(filename, &callback)
-        request :remove, filename, &callback
+      def remove(filename, &)
+        request(:remove, filename, &)
       end
 
       # Identical to #remove, but blocks until the server responds. It will raise
@@ -473,8 +470,8 @@ module Net; module SFTP
       # return the Response object for the request.
       #
       #   sftp.remove!("/path/to/file")
-      def remove!(filename, &callback)
-        wait_for(remove(filename, &callback))
+      def remove!(filename, &)
+        wait_for(remove(filename, &))
       end
 
       # :call-seq:
@@ -487,8 +484,8 @@ module Net; module SFTP
       # Protocol::V04::Attributes, and Protocol::V06::Attributes.)
       #
       #   sftp.mkdir("/path/to/directory", :permissions => 0550).wait
-      def mkdir(path, attrs={}, &callback)
-        request :mkdir, path, attrs, &callback
+      def mkdir(path, attrs = {}, &)
+        request(:mkdir, path, attrs, &)
       end
 
       # Identical to #mkdir, but blocks until the server responds. It will raise
@@ -496,8 +493,8 @@ module Net; module SFTP
       # return the Response object for the request.
       #
       #   sftp.mkdir!("/path/to/directory", :permissions => 0550)
-      def mkdir!(path, attrs={}, &callback)
-        wait_for(mkdir(path, attrs, &callback))
+      def mkdir!(path, attrs = {}, &)
+        wait_for(mkdir(path, attrs, &))
       end
 
       # :call-seq:
@@ -508,8 +505,8 @@ module Net; module SFTP
       # be empty before it can be removed.
       #
       #   sftp.rmdir("/path/to/directory").wait
-      def rmdir(path, &callback)
-        request :rmdir, path, &callback
+      def rmdir(path, &)
+        request(:rmdir, path, &)
       end
 
       # Identical to #rmdir, but blocks until the server responds. It will raise
@@ -517,8 +514,8 @@ module Net; module SFTP
       # return the Response object for the request.
       #
       #   sftp.rmdir!("/path/to/directory")
-      def rmdir!(path, &callback)
-        wait_for(rmdir(path, &callback))
+      def rmdir!(path, &)
+        wait_for(rmdir(path, &))
       end
 
       # :call-seq:
@@ -533,8 +530,8 @@ module Net; module SFTP
       #
       #   request = sftp.realpath("/path/../to/../directory").wait
       #   puts request[:names].first.name
-      def realpath(path, &callback)
-        request :realpath, path, &callback
+      def realpath(path, &)
+        request(:realpath, path, &)
       end
 
       # Identical to #realpath, but blocks until the server responds. It will raise
@@ -542,16 +539,16 @@ module Net; module SFTP
       # return a name object identifying the path.
       #
       #   puts(sftp.realpath!("/path/../to/../directory"))
-      def realpath!(path, &callback)
-        wait_for(realpath(path, &callback), :names).first
+      def realpath!(path, &)
+        wait_for(realpath(path, &), :names).first
       end
 
       # Identical to the #lstat method, except that it follows symlinks
       # (e.g., if you give it the path to a symlink, it will stat the target
       # of the symlink rather than the symlink itself). See the #lstat method
       # for full documentation.
-      def stat(path, flags=nil, &callback)
-        request :stat, path, flags, &callback
+      def stat(path, flags = nil, &)
+        request(:stat, path, flags, &)
       end
 
       # Identical to #stat, but blocks until the server responds. It will raise
@@ -559,8 +556,8 @@ module Net; module SFTP
       # return an attribute object for the named path.
       #
       #   attrs = sftp.stat!("/path/to/file")
-      def stat!(path, flags=nil, &callback)
-        wait_for(stat(path, flags, &callback), :attrs)
+      def stat!(path, flags = nil, &)
+        wait_for(stat(path, flags, &), :attrs)
       end
 
       # :call-seq:
@@ -579,8 +576,8 @@ module Net; module SFTP
       #   that already exists.
       # * 0x0002 - perform the rewrite atomically.
       # * 0x0004 - allow the server to perform the rename as it prefers.
-      def rename(name, new_name, flags=nil, &callback)
-        request :rename, name, new_name, flags, &callback
+      def rename(name, new_name, flags = nil, &)
+        request(:rename, name, new_name, flags, &)
       end
 
       # Identical to #rename, but blocks until the server responds. It will raise
@@ -588,8 +585,8 @@ module Net; module SFTP
       # return the Response object for the request.
       #
       #   sftp.rename!("/path/to/old", "/path/to/new")
-      def rename!(name, new_name, flags=nil, &callback)
-        wait_for(rename(name, new_name, flags, &callback))
+      def rename!(name, new_name, flags = nil, &)
+        wait_for(rename(name, new_name, flags, &))
       end
 
       # :call-seq:
@@ -603,8 +600,8 @@ module Net; module SFTP
       #
       #   request = sftp.readlink("/path/to/symlink").wait
       #   puts request.response[:names].first.name
-      def readlink(path, &callback)
-        request :readlink, path, &callback
+      def readlink(path, &)
+        request(:readlink, path, &)
       end
 
       # Identical to #readlink, but blocks until the server responds. It will raise
@@ -612,8 +609,8 @@ module Net; module SFTP
       # return the Name object for the path that the symlink targets.
       #
       #   item = sftp.readlink!("/path/to/symlink")
-      def readlink!(path, &callback)
-        wait_for(readlink(path, &callback), :names).first
+      def readlink!(path, &)
+        wait_for(readlink(path, &), :names).first
       end
 
       # :call-seq:
@@ -626,8 +623,8 @@ module Net; module SFTP
       # #link method, so it is safe to use this method in protocol version 6.
       #
       #   sftp.symlink("/path/to/file", "/path/to/symlink").wait
-      def symlink(path, target, &callback)
-        request :symlink, path, target, &callback
+      def symlink(path, target, &)
+        request(:symlink, path, target, &)
       end
 
       # Identical to #symlink, but blocks until the server responds. It will raise
@@ -635,8 +632,8 @@ module Net; module SFTP
       # return the Response object for the request.
       #
       #   sftp.symlink!("/path/to/file", "/path/to/symlink")
-      def symlink!(path, target, &callback)
-        wait_for(symlink(path, target, &callback))
+      def symlink!(path, target, &)
+        wait_for(symlink(path, target, &))
       end
 
       # :call-seq:
@@ -653,8 +650,8 @@ module Net; module SFTP
       #
       # Note that #link is only available for SFTP protocol 6 and higher. You
       # can use #symlink for protocols 3 and higher.
-      def link(new_link_path, existing_path, symlink=true, &callback)
-        request :link, new_link_path, existing_path, symlink, &callback
+      def link(new_link_path, existing_path, symlink = true, &)
+        request(:link, new_link_path, existing_path, symlink, &)
       end
 
       # Identical to #link, but blocks until the server responds. It will raise
@@ -662,8 +659,8 @@ module Net; module SFTP
       # return the Response object for the request.
       #
       #   sftp.link!("/path/to/symlink", "/path/to/file", true)
-      def link!(new_link_path, existing_path, symlink=true, &callback)
-        wait_for(link(new_link_path, existing_path, symlink, &callback))
+      def link!(new_link_path, existing_path, symlink = true, &)
+        wait_for(link(new_link_path, existing_path, symlink, &))
       end
 
       # :call-seq:
@@ -690,15 +687,15 @@ module Net; module SFTP
       # * 0x0200 - Advisory lock. The server need not honor the lock instruction.
       #
       # Once created, the lock may be removed via the #unblock method.
-      def block(handle, offset, length, mask, &callback)
-        request :block, handle, offset, length, mask, &callback
+      def block(handle, offset, length, mask, &)
+        request(:block, handle, offset, length, mask, &)
       end
 
       # Identical to #block, but blocks until the server responds. It will raise
       # a StatusException if the request was unsuccessful. Otherwise, it will
       # return the Response object for the request.
-      def block!(handle, offset, length, mask, &callback)
-        wait_for(block(handle, offset, length, mask, &callback))
+      def block!(handle, offset, length, mask, &)
+        wait_for(block(handle, offset, length, mask, &))
       end
 
       # :call-seq:
@@ -709,18 +706,16 @@ module Net; module SFTP
       # available in protocol versions 6 and higher. The +offset+ and +length+
       # parameters must exactly match those that were given to #block when the
       # lock was acquired.
-      def unblock(handle, offset, length, &callback)
-        request :unblock, handle, offset, length, &callback
+      def unblock(handle, offset, length, &)
+        request(:unblock, handle, offset, length, &)
       end
 
       # Identical to #unblock, but blocks until the server responds. It will raise
       # a StatusException if the request was unsuccessful. Otherwise, it will
       # return the Response object for the request.
-      def unblock!(handle, offset, length, &callback)
-        wait_for(unblock(handle, offset, length, &callback))
+      def unblock!(handle, offset, length, &)
+        wait_for(unblock(handle, offset, length, &))
       end
-
-    public # miscellaneous methods
 
       # Closes the SFTP connection, but not the SSH connection. Blocks until the
       # session has terminated. Once the session has terminated, further operations
@@ -728,6 +723,7 @@ module Net; module SFTP
       # via the #connect method.
       def close_channel
         return unless open?
+
         channel.close
         loop { !closed? }
       end
@@ -768,7 +764,7 @@ module Net; module SFTP
       def connect(&block)
         case state
         when :open
-          block.call(self) if block
+          yield(self) if block
         when :closed
           @state = :opening
           @channel = session.open_channel(&method(:when_channel_confirmed))
@@ -784,13 +780,13 @@ module Net; module SFTP
 
       # Same as the #connect method, but blocks until the SFTP connection has
       # been fully initialized.
-      def connect!(&block)
-        connect(&block)
+      def connect!(&)
+        connect(&)
         loop { opening? }
         self
       end
 
-      alias :loop_forever :loop
+      alias loop_forever loop
 
       # Runs the SSH event loop while the given block returns true. This lets
       # you set up a state machine and then "fire it off". If you do not specify
@@ -800,7 +796,7 @@ module Net; module SFTP
       #   sftp.remove("/path/to/file")
       #   sftp.loop
       def loop(&block)
-        block ||= Proc.new { pending_requests.any? }
+        block ||= proc { pending_requests.any? }
         session.loop(&block)
       end
 
@@ -812,7 +808,7 @@ module Net; module SFTP
       # sending the packet directly. (See #open, #close, etc.)
       def send_packet(type, *args)
         data = Net::SSH::Buffer.from(*args)
-        msg = Net::SSH::Buffer.from(:long, data.length+1, :byte, type, :raw, data)
+        msg = Net::SSH::Buffer.from(:long, data.length + 1, :byte, type, :raw, data)
         channel.send_data(msg.to_s)
       end
 
@@ -823,13 +819,13 @@ module Net; module SFTP
       #++
 
       # The input buffer used to accumulate packet data
-      def input; @input; end
+      attr_reader :input
 
       # Create and enqueue a new SFTP request of the given type, with the
       # given arguments. Returns a new Request instance that encapsulates the
       # request.
-      def request(type, *args, &callback)
-        request = Request.new(self, type, protocol.send(type, *args), &callback)
+      def request(type, *args, &)
+        request = Request.new(self, type, protocol.send(type, *args), &)
         info { "sending #{type} packet (#{request.id})" }
         pending_requests[request.id] = request
       end
@@ -840,7 +836,7 @@ module Net; module SFTP
       # If +property+ is given, the corresponding property from the response
       # will be returned; otherwise, the response object itself will be
       # returned.
-      def wait_for(request, property=nil)
+      def wait_for(request, property = nil)
         request.wait
         if request.response.eof?
           nil
@@ -872,8 +868,8 @@ module Net; module SFTP
         debug { "sftp subsystem successfully started" }
         @state = :init
 
-        channel.on_data { |c,data| input.append(data) }
-        channel.on_extended_data { |c,t,data| debug { data } }
+        channel.on_data { |_c, data| input.append(data) }
+        channel.on_extended_data { |_c, _t, data| debug { data } }
 
         channel.on_close(&method(:when_channel_closed))
         channel.on_process(&method(:when_channel_polled))
@@ -882,7 +878,7 @@ module Net; module SFTP
       end
 
       # Called when the SSH server closes the underlying channel.
-      def when_channel_closed(channel)
+      def when_channel_closed(_channel)
         debug { "sftp channel closed" }
         @channel = nil
         @state = :closed
@@ -892,15 +888,17 @@ module Net; module SFTP
       # This basically checks the input buffer to see if enough input has been
       # accumulated to handle. If there has, the packet is parsed and
       # dispatched, according to its type (see #do_version and #dispatch_request).
-      def when_channel_polled(channel)
-        while input.length > 0
+      def when_channel_polled(_channel)
+        while input.length.positive?
           if @packet_length.nil?
             # make sure we've read enough data to tell how long the packet is
             return unless input.length >= 4
+
             @packet_length = input.read_long
           end
 
           return unless input.length >= @packet_length + 4
+
           packet = Net::SFTP::Packet.new(input.read(@packet_length))
           input.consume!
           @packet_length = nil
@@ -950,5 +948,4 @@ module Net; module SFTP
         request.respond_to(packet)
       end
   end
-
 end; end

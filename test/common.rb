@@ -1,24 +1,34 @@
-require 'minitest/autorun'
-require 'mocha/minitest'
-require 'stringio'
+# frozen_string_literal: true
+
+if ENV["COVERAGE"]
+  require "simplecov"
+  SimpleCov.start do
+    add_filter "/test/"
+    enable_coverage :branch
+  end
+end
+
+require "minitest/autorun"
+require "mocha/minitest"
+require "stringio"
 
 begin
-  require 'net/ssh'
-  require 'net/ssh/version'
-  raise LoadError, "wrong version" unless Net::SSH::Version::STRING >= '1.99.0'
+  require "net/ssh"
+  require "net/ssh/version"
+  raise LoadError, "wrong version" unless Net::SSH::Version::STRING >= "1.99.0"
 rescue LoadError
   begin
-    gem 'net-ssh', ">= 2.0.0"
-    require 'net/ssh'
+    gem "net-ssh", ">= 2.0.0"
+    require "net/ssh"
   rescue LoadError => e
     abort "could not load net/ssh v2 (#{e.inspect})"
   end
 end
 
 $LOAD_PATH.unshift "#{File.dirname(__FILE__)}/../lib"
-require 'net/sftp'
-require 'net/sftp/constants'
-require 'net/ssh/test'
+require "net/sftp"
+require "net/sftp/constants"
+require "net/ssh/test"
 
 class Net::SFTP::TestCase < Minitest::Test
   include Net::SFTP::Constants::PacketTypes
@@ -36,11 +46,11 @@ class Net::SFTP::TestCase < Minitest::Test
       Net::SSH::Buffer.from(*args).to_s
     end
 
-    def sftp(options={}, version=nil)
+    def sftp(options = {}, version = nil)
       @sftp ||= Net::SFTP::Session.new(connection(options), version)
     end
 
-    def expect_sftp_session(opts={})
+    def expect_sftp_session(opts = {})
       story do |session|
         channel = session.opens_channel
         channel.sends_subsystem("sftp")
@@ -58,17 +68,17 @@ class Net::SFTP::TestCase < Minitest::Test
       end
     end
 
-    def assert_progress_reported_open(expect={})
+    def assert_progress_reported_open(expect = {})
       assert_progress_reported(:open, expect)
     end
 
-    def assert_progress_reported_put(offset, data, expect={})
+    def assert_progress_reported_put(offset, data, expect = {})
       assert_equal offset, current_event[3] if offset
       assert_equal data, current_event[4] if data
       assert_progress_reported(:put, expect)
     end
 
-    def assert_progress_reported_get(offset, data, expect={})
+    def assert_progress_reported_get(offset, data, expect = {})
       assert_equal offset, current_event[3] if offset
       if data.is_a?(0.class)
         assert_equal data, current_event[4].length
@@ -78,7 +88,7 @@ class Net::SFTP::TestCase < Minitest::Test
       assert_progress_reported(:get, expect)
     end
 
-    def assert_progress_reported_close(expect={})
+    def assert_progress_reported_close(expect = {})
       assert_progress_reported(:close, expect)
     end
 
@@ -91,7 +101,7 @@ class Net::SFTP::TestCase < Minitest::Test
       assert_progress_reported(:finish)
     end
 
-    def assert_progress_reported(event, expect={})
+    def assert_progress_reported(event, expect = {})
       assert_equal event, current_event[0]
       expect.each do |key, value|
         assert_equal value, current_event[2].send(key)
@@ -100,7 +110,7 @@ class Net::SFTP::TestCase < Minitest::Test
     end
 
     def assert_no_more_reported_events
-      assert @progress.empty?, "expected #{@progress.empty?} to be empty"
+      assert_empty @progress, "expected #{@progress.empty?} to be empty"
     end
 
     def prepare_progress!
@@ -129,9 +139,9 @@ class Net::SSH::Test::Channel
     fragment_len ||= 0
     whole_packet = sftp_packet(type, *args)
 
-    if 0 < fragment_len && fragment_len < whole_packet.length
+    if fragment_len.positive? && fragment_len < whole_packet.length
       gets_data(whole_packet[0, whole_packet.length - fragment_len])
-      gets_data(whole_packet[-fragment_len..-1])
+      gets_data(whole_packet[-fragment_len..])
     else
       gets_data(whole_packet)
     end
@@ -145,7 +155,7 @@ class Net::SSH::Test::Channel
 
     def sftp_packet(type, *args)
       data = Net::SSH::Buffer.from(*args)
-      Net::SSH::Buffer.from(:long, data.length+1, :byte, type, :raw, data).to_s
+      Net::SSH::Buffer.from(:long, data.length + 1, :byte, type, :raw, data).to_s
     end
 end
 

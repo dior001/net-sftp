@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "common"
 
 class SessionTest < Net::SFTP::TestCase
@@ -16,10 +18,9 @@ class SessionTest < Net::SFTP::TestCase
   def test_passing_version_should_cause_same_version_to_be_passed_and_used
     version = 3
     expect_sftp_session :client_version => version, :server_version => version
-    assert_scripted { sftp({},version).connect! }
+    assert_scripted { sftp({}, version).connect! }
     assert_equal version, sftp.protocol.version
   end
-
 
   def test_v1_open_read_only_that_succeeds_should_invoke_callback
     expect_open("/path/to/file", "r", nil, :server_version => 1)
@@ -30,7 +31,7 @@ class SessionTest < Net::SFTP::TestCase
     expect_open("/path/to/file", "r", nil, :server_version => 1, :fail => 2)
 
     assert_command_with_callback(:open, "/path/to/file") do |response|
-      assert !response.ok?
+      refute_predicate response, :ok?
       assert_equal 2, response.code
     end
   end
@@ -51,23 +52,23 @@ class SessionTest < Net::SFTP::TestCase
   end
 
   def test_v1_open_with_permissions_should_specify_permissions
-    expect_open("/path/to/file", "r", 0765, :server_version => 1)
-    assert_successful_open("/path/to/file", "r", :permissions => 0765)
+    expect_open("/path/to/file", "r", 0o765, :server_version => 1)
+    assert_successful_open("/path/to/file", "r", :permissions => 0o765)
   end
 
   def test_v4_open_with_permissions_should_specify_permissions
-    expect_open("/path/to/file", "r", 0765, :server_version => 4)
-    assert_successful_open("/path/to/file", "r", :permissions => 0765)
+    expect_open("/path/to/file", "r", 0o765, :server_version => 4)
+    assert_successful_open("/path/to/file", "r", :permissions => 0o765)
   end
 
   def test_v5_open_read_only_shuld_invoke_callback
-    expect_open("/path/to/file", "r", 0765, :server_version => 5)
-    assert_successful_open("/path/to/file", "r", :permissions => 0765)
+    expect_open("/path/to/file", "r", 0o765, :server_version => 5)
+    assert_successful_open("/path/to/file", "r", :permissions => 0o765)
   end
 
   def test_v6_open_with_permissions_should_specify_permissions
-    expect_open("/path/to/file", "r", 0765, :server_version => 6)
-    assert_successful_open("/path/to/file", "r", :permissions => 0765)
+    expect_open("/path/to/file", "r", 0o765, :server_version => 6)
+    assert_successful_open("/path/to/file", "r", :permissions => 0o765)
   end
 
   def test_open_bang_should_block_and_return_handle
@@ -89,7 +90,7 @@ class SessionTest < Net::SFTP::TestCase
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:close, "handle") { |r| assert r.ok? }
+    assert_command_with_callback(:close, "handle") { |r| assert_predicate r, :ok? }
   end
 
   def test_close_bang_should_block_and_return_response
@@ -99,7 +100,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:close!, "handle")
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_read_should_send_read_request_and_invoke_callback
@@ -109,7 +110,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     assert_command_with_callback(:read, "handle", 512123, 1024) do |response|
-      assert response.ok?
+      assert_predicate response, :ok?
       assert_equal "this is some data!", response[:data]
     end
   end
@@ -141,7 +142,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     assert_command_with_callback(:write, "handle", 512123, "this is some data!") do |response|
-      assert response.ok?
+      assert_predicate response, :ok?
     end
   end
 
@@ -152,21 +153,22 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:write!, "handle", 512123, "this is some data!")
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_v1_lstat_should_send_lstat_request_and_invoke_callback
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_LSTAT, :long, 0, :string, "/path/to/file")
-      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0765, :long, 123456789, :long, 234567890)
+      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0o765, :long, 123456789,
+                          :long, 234567890)
     end
 
     assert_command_with_callback(:lstat, "/path/to/file") do |response|
-      assert response.ok?
+      assert_predicate response, :ok?
       assert_equal 123456, response[:attrs].size
       assert_equal 1, response[:attrs].uid
       assert_equal 2, response[:attrs].gid
-      assert_equal 0765, response[:attrs].permissions
+      assert_equal 0o765, response[:attrs].permissions
       assert_equal 123456789, response[:attrs].atime
       assert_equal 234567890, response[:attrs].mtime
     end
@@ -193,7 +195,8 @@ class SessionTest < Net::SFTP::TestCase
   def test_lstat_bang_should_block_and_return_attrs
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_LSTAT, :long, 0, :string, "/path/to/file")
-      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0765, :long, 123456789, :long, 234567890)
+      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0o765, :long, 123456789,
+                          :long, 234567890)
     end
 
     attrs = assert_synchronous_command(:lstat!, "/path/to/file")
@@ -201,7 +204,7 @@ class SessionTest < Net::SFTP::TestCase
     assert_equal 123456, attrs.size
     assert_equal 1, attrs.uid
     assert_equal 2, attrs.gid
-    assert_equal 0765, attrs.permissions
+    assert_equal 0o765, attrs.permissions
     assert_equal 123456789, attrs.atime
     assert_equal 234567890, attrs.mtime
   end
@@ -209,15 +212,16 @@ class SessionTest < Net::SFTP::TestCase
   def test_v1_fstat_should_send_fstat_request_and_invoke_callback
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_FSTAT, :long, 0, :string, "handle")
-      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0765, :long, 123456789, :long, 234567890)
+      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0o765, :long, 123456789,
+                          :long, 234567890)
     end
 
     assert_command_with_callback(:fstat, "handle") do |response|
-      assert response.ok?
+      assert_predicate response, :ok?
       assert_equal 123456, response[:attrs].size
       assert_equal 1, response[:attrs].uid
       assert_equal 2, response[:attrs].gid
-      assert_equal 0765, response[:attrs].permissions
+      assert_equal 0o765, response[:attrs].permissions
       assert_equal 123456789, response[:attrs].atime
       assert_equal 234567890, response[:attrs].mtime
     end
@@ -244,7 +248,8 @@ class SessionTest < Net::SFTP::TestCase
   def test_fstat_bang_should_block_and_return_attrs
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_FSTAT, :long, 0, :string, "handle")
-      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0765, :long, 123456789, :long, 234567890)
+      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0o765, :long, 123456789,
+                          :long, 234567890)
     end
 
     attrs = assert_synchronous_command(:fstat!, "handle")
@@ -252,83 +257,94 @@ class SessionTest < Net::SFTP::TestCase
     assert_equal 123456, attrs.size
     assert_equal 1, attrs.uid
     assert_equal 2, attrs.gid
-    assert_equal 0765, attrs.permissions
+    assert_equal 0o765, attrs.permissions
     assert_equal 123456789, attrs.atime
     assert_equal 234567890, attrs.mtime
   end
 
   def test_v1_setstat_should_send_v1_attributes
     expect_sftp_session :server_version => 1 do |channel|
-      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0xc, :long, 0765, :long, 1234567890, :long, 2345678901)
+      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0xc, :long, 0o765, :long, 1234567890, :long,
+                           2345678901)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:setstat, "/path/to/file", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901)
+    assert_command_with_callback(:setstat, "/path/to/file", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901)
   end
 
   def test_v4_setstat_should_send_v4_attributes
     expect_sftp_session :server_version => 4 do |channel|
-      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0x2c, :byte, 1, :long, 0765, :int64, 1234567890, :int64, 2345678901)
+      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0x2c, :byte, 1, :long, 0o765, :int64,
+                           1234567890, :int64, 2345678901)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:setstat, "/path/to/file", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901)
+    assert_command_with_callback(:setstat, "/path/to/file", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901)
   end
 
   def test_v6_setstat_should_send_v6_attributes
     expect_sftp_session :server_version => 6 do |channel|
-      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0x102c, :byte, 1, :long, 0765, :int64, 1234567890, :int64, 2345678901, :string, "text/plain")
+      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0x102c, :byte, 1, :long, 0o765, :int64,
+                           1234567890, :int64, 2345678901, :string, "text/plain")
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:setstat, "/path/to/file", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901, :mime_type => "text/plain")
+    assert_command_with_callback(:setstat, "/path/to/file", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901,
+                                                            :mime_type => "text/plain")
   end
 
   def test_setstat_bang_should_block_and_return_response
     expect_sftp_session :server_version => 1 do |channel|
-      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0xc, :long, 0765, :long, 1234567890, :long, 2345678901)
+      channel.sends_packet(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :long, 0xc, :long, 0o765, :long, 1234567890, :long,
+                           2345678901)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    response = assert_synchronous_command(:setstat!, "/path/to/file", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901)
-    assert response.ok?
+    response = assert_synchronous_command(:setstat!, "/path/to/file", :permissions => 0o765, :atime => 1234567890,
+                                                                      :mtime => 2345678901)
+    assert_predicate response, :ok?
   end
 
   def test_v1_fsetstat_should_send_v1_attributes
     expect_sftp_session :server_version => 1 do |channel|
-      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0xc, :long, 0765, :long, 1234567890, :long, 2345678901)
+      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0xc, :long, 0o765, :long, 1234567890, :long,
+                           2345678901)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:fsetstat, "handle", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901)
+    assert_command_with_callback(:fsetstat, "handle", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901)
   end
 
   def test_v4_fsetstat_should_send_v4_attributes
     expect_sftp_session :server_version => 4 do |channel|
-      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0x2c, :byte, 1, :long, 0765, :int64, 1234567890, :int64, 2345678901)
+      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0x2c, :byte, 1, :long, 0o765, :int64, 1234567890,
+                           :int64, 2345678901)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:fsetstat, "handle", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901)
+    assert_command_with_callback(:fsetstat, "handle", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901)
   end
 
   def test_v6_fsetstat_should_send_v6_attributes
     expect_sftp_session :server_version => 6 do |channel|
-      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0x102c, :byte, 1, :long, 0765, :int64, 1234567890, :int64, 2345678901, :string, "text/plain")
+      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0x102c, :byte, 1, :long, 0o765, :int64, 1234567890,
+                           :int64, 2345678901, :string, "text/plain")
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:fsetstat, "handle", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901, :mime_type => "text/plain")
+    assert_command_with_callback(:fsetstat, "handle", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901,
+                                                      :mime_type => "text/plain")
   end
 
   def test_fsetstat_bang_should_block_and_return_response
     expect_sftp_session :server_version => 1 do |channel|
-      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0xc, :long, 0765, :long, 1234567890, :long, 2345678901)
+      channel.sends_packet(FXP_FSETSTAT, :long, 0, :string, "handle", :long, 0xc, :long, 0o765, :long, 1234567890, :long,
+                           2345678901)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    response = assert_synchronous_command(:fsetstat!, "handle", :permissions => 0765, :atime => 1234567890, :mtime => 2345678901)
-    assert response.ok?
+    response = assert_synchronous_command(:fsetstat!, "handle", :permissions => 0o765, :atime => 1234567890, :mtime => 2345678901)
+    assert_predicate response, :ok?
   end
 
   def test_opendir_should_send_opendir_request_and_invoke_callback
@@ -356,20 +372,20 @@ class SessionTest < Net::SFTP::TestCase
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 1)
     end
 
-    assert_command_with_callback(:readdir, "handle") { |r| assert r.eof? }
+    assert_command_with_callback(:readdir, "handle") { |r| assert_predicate r, :eof? }
   end
 
   def test_readdir_bang_should_block_and_return_names_array
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_READDIR, :long, 0, :string, "handle")
       channel.gets_packet(FXP_NAME, :long, 0, :long, 2,
-        :string, "first", :string, "longfirst", :long, 0x0,
-        :string, "next", :string, "longnext", :long, 0x0)
+                          :string, "first", :string, "longfirst", :long, 0x0,
+                          :string, "next", :string, "longnext", :long, 0x0)
     end
 
     names = assert_synchronous_command(:readdir!, "handle")
     assert_equal 2, names.length
-    assert_equal %w(first next), names.map { |n| n.name }
+    assert_equal(%w(first next), names.map(&:name))
   end
 
   def test_remove_should_send_remove_packet
@@ -388,26 +404,26 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:remove!, "/path/to/file")
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_mkdir_should_send_mkdir_packet
     expect_sftp_session do |channel|
-      channel.sends_packet(FXP_MKDIR, :long, 0, :string, "/path/to/dir", :long, 0x4, :byte, 1, :long, 0765)
+      channel.sends_packet(FXP_MKDIR, :long, 0, :string, "/path/to/dir", :long, 0x4, :byte, 1, :long, 0o765)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    assert_command_with_callback(:mkdir, "/path/to/dir", :permissions => 0765)
+    assert_command_with_callback(:mkdir, "/path/to/dir", :permissions => 0o765)
   end
 
   def test_mkdir_bang_should_block_and_return_response
     expect_sftp_session do |channel|
-      channel.sends_packet(FXP_MKDIR, :long, 0, :string, "/path/to/dir", :long, 0x4, :byte, 1, :long, 0765)
+      channel.sends_packet(FXP_MKDIR, :long, 0, :string, "/path/to/dir", :long, 0x4, :byte, 1, :long, 0o765)
       channel.gets_packet(FXP_STATUS, :long, 0, :long, 0)
     end
 
-    response = assert_synchronous_command(:mkdir!, "/path/to/dir", :permissions => 0765)
-    assert response.ok?
+    response = assert_synchronous_command(:mkdir!, "/path/to/dir", :permissions => 0o765)
+    assert_predicate response, :ok?
   end
 
   def test_rmdir_should_send_rmdir_packet
@@ -426,7 +442,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:rmdir!, "/path/to/dir")
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_realpath_should_send_realpath_packet
@@ -451,15 +467,16 @@ class SessionTest < Net::SFTP::TestCase
   def test_v1_stat_should_send_stat_request_and_invoke_callback
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_STAT, :long, 0, :string, "/path/to/file")
-      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0765, :long, 123456789, :long, 234567890)
+      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0o765, :long, 123456789,
+                          :long, 234567890)
     end
 
     assert_command_with_callback(:stat, "/path/to/file") do |response|
-      assert response.ok?
+      assert_predicate response, :ok?
       assert_equal 123456, response[:attrs].size
       assert_equal 1, response[:attrs].uid
       assert_equal 2, response[:attrs].gid
-      assert_equal 0765, response[:attrs].permissions
+      assert_equal 0o765, response[:attrs].permissions
       assert_equal 123456789, response[:attrs].atime
       assert_equal 234567890, response[:attrs].mtime
     end
@@ -486,7 +503,8 @@ class SessionTest < Net::SFTP::TestCase
   def test_stat_bang_should_block_and_return_attrs
     expect_sftp_session :server_version => 1 do |channel|
       channel.sends_packet(FXP_STAT, :long, 0, :string, "/path/to/file")
-      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0765, :long, 123456789, :long, 234567890)
+      channel.gets_packet(FXP_ATTRS, :long, 0, :long, 0xF, :int64, 123456, :long, 1, :long, 2, :long, 0o765, :long, 123456789,
+                          :long, 234567890)
     end
 
     attrs = assert_synchronous_command(:stat!, "/path/to/file")
@@ -494,7 +512,7 @@ class SessionTest < Net::SFTP::TestCase
     assert_equal 123456, attrs.size
     assert_equal 1, attrs.uid
     assert_equal 2, attrs.gid
-    assert_equal 0765, attrs.permissions
+    assert_equal 0o765, attrs.permissions
     assert_equal 123456789, attrs.atime
     assert_equal 234567890, attrs.mtime
   end
@@ -537,7 +555,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:rename!, "from", "to")
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_v2_readlink_should_be_unimplemented
@@ -592,7 +610,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:symlink!, "/path/to/source", "/path/to/link")
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_v5_link_should_be_unimplemented
@@ -615,7 +633,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:link!, "/path/to/link", "/path/to/source", true)
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_v5_block_should_be_unimplemented
@@ -638,7 +656,7 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:block!, "handle", 12345, 67890, 0xabcd)
-    assert response.ok?
+    assert_predicate response, :ok?
   end
 
   def test_v5_unblock_should_be_unimplemented
@@ -661,12 +679,124 @@ class SessionTest < Net::SFTP::TestCase
     end
 
     response = assert_synchronous_command(:unblock!, "handle", 12345, 67890)
-    assert response.ok?
+    assert_predicate response, :ok?
+  end
+
+  def test_version_negotiation_should_parse_server_extensions
+    story do |session|
+      channel = session.opens_channel
+      channel.sends_subsystem("sftp")
+      channel.sends_packet(FXP_INIT, :long, Net::SFTP::Session::HIGHEST_PROTOCOL_VERSION_SUPPORTED)
+      channel.gets_packet(FXP_VERSION, :long, Net::SFTP::Session::HIGHEST_PROTOCOL_VERSION_SUPPORTED,
+                          :string, "posix-rename@openssh.com", :string, "1")
+    end
+
+    assert_scripted { sftp.connect! }
+    assert_equal Net::SFTP::Session::HIGHEST_PROTOCOL_VERSION_SUPPORTED, sftp.protocol.version
+  end
+
+  def test_connect_when_already_open_should_immediately_invoke_block
+    expect_sftp_session
+    assert_scripted { sftp.connect! }
+
+    called_with = nil
+    result = sftp.connect { |session| called_with = session }
+    assert_equal sftp, called_with
+    assert_equal sftp, result
+  end
+
+  def test_connect_when_already_open_and_no_block_given_should_just_return_self
+    expect_sftp_session
+    assert_scripted { sftp.connect! }
+
+    assert_equal sftp, sftp.connect
+  end
+
+  def test_connect_while_opening_should_queue_additional_block_to_invoke_later
+    expect_sftp_session
+
+    assert_scripted do
+      sftp.connect
+      assert_predicate sftp, :opening?
+
+      called = false
+      sftp.connect { called = true }
+
+      sftp.loop { sftp.opening? }
+      assert called
+    end
+  end
+
+  def test_when_channel_polled_should_wait_for_enough_data_to_read_packet_length
+    story do |session|
+      channel = session.opens_channel
+      channel.sends_subsystem("sftp")
+      channel.sends_packet(FXP_INIT, :long, Net::SFTP::Session::HIGHEST_PROTOCOL_VERSION_SUPPORTED)
+      channel.gets_packet_in_two(6, FXP_VERSION, :long, Net::SFTP::Session::HIGHEST_PROTOCOL_VERSION_SUPPORTED)
+    end
+
+    assert_scripted { sftp.connect! }
+    assert_equal Net::SFTP::Session::HIGHEST_PROTOCOL_VERSION_SUPPORTED, sftp.protocol.version
+  end
+
+  def test_connect_should_raise_exception_when_subsystem_request_fails
+    story do |session|
+      channel = session.opens_channel
+      channel.sends_subsystem("sftp", true, false)
+    end
+
+    assert_raises(Net::SFTP::Exception) do
+      assert_scripted { sftp.connect! }
+    end
+  end
+
+  def test_close_channel_should_close_channel_and_wait_until_closed
+    expect_sftp_session do |channel|
+      channel.sends_close
+      channel.gets_close
+    end
+
+    assert_scripted do
+      sftp.connect!
+      refute_predicate sftp, :closed?
+      sftp.close_channel
+      assert_predicate sftp, :closed?
+    end
+  end
+
+  def test_close_channel_when_already_closed_should_do_nothing
+    expect_sftp_session
+
+    Net::SSH::Test::Extensions::IO.with_test_extension do
+      assert_nil Net::SFTP::Session.new(connection).close_channel
+    end
+  end
+
+  def test_file_should_return_memoized_file_factory
+    expect_sftp_session
+
+    assert_scripted do
+      sftp.connect!
+      factory = sftp.file
+      assert_instance_of Net::SFTP::Operations::FileFactory, factory
+      assert_same factory, sftp.file
+    end
+  end
+
+  def test_dir_should_return_memoized_dir_helper
+    expect_sftp_session
+
+    assert_scripted do
+      sftp.connect!
+      dir = sftp.dir
+      assert_instance_of Net::SFTP::Operations::Dir, dir
+      assert_same dir, sftp.dir
+    end
   end
 
   private
 
-    def assert_not_implemented(server_version, command, *args)
+    def assert_not_implemented(_server_version, command, *args)
       expect_sftp_session :server_version => 1
       Net::SSH::Test::Extensions::IO.with_test_extension do
         sftp.connect!
@@ -693,19 +823,19 @@ class SessionTest < Net::SFTP::TestCase
           yield response if block_given?
         end
         sequence << :after
-        assert_equal [:start, :done, :after], sequence, "expected #{command} to be synchronous"
+        assert_equal %i(start done after), sequence, "expected #{command} to be synchronous"
         return result
       end
     end
 
     def assert_successful_open(*args)
       assert_command_with_callback(:open, *args) do |response|
-        assert response.ok?
+        assert_predicate response, :ok?
         assert_equal "handle", response[:handle]
       end
     end
 
-    def expect_open(path, mode, perms, options={})
+    def expect_open(path, mode, perms, options = {})
       version = options[:server_version] || 6
 
       fail = options.delete(:fail)
@@ -717,25 +847,25 @@ class SessionTest < Net::SFTP::TestCase
       expect_sftp_session(options) do |channel|
         if version >= 5
           flags, access = case mode
-            when "r" then 
+                          when "r"
               [FV5::OPEN_EXISTING, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES]
-            when "w" then
+                          when "w"
               [FV5::CREATE_TRUNCATE, ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES]
-            when "rw" then
+                          when "rw"
               [FV5::OPEN_OR_CREATE, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES]
-            when "a" then
+                          when "a"
               [FV5::OPEN_OR_CREATE | FV5::APPEND_DATA, ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES | ACE::Mask::APPEND_DATA]
-            else raise ArgumentError, "unsupported mode #{mode.inspect}"
+                          else raise ArgumentError, "unsupported mode #{mode.inspect}"
           end
 
           channel.sends_packet(FXP_OPEN, :long, 0, :string, path, :long, access, :long, flags, *attrs)
         else
           flags = case mode
-            when "r"  then FV1::READ
-            when "w"  then FV1::WRITE | FV1::TRUNC | FV1::CREAT
-            when "rw" then FV1::WRITE | FV1::READ
-            when "a"  then FV1::APPEND | FV1::WRITE | FV1::CREAT
-            else raise ArgumentError, "unsupported mode #{mode.inspect}"
+                  when "r"  then FV1::READ
+                  when "w"  then FV1::WRITE | FV1::TRUNC | FV1::CREAT
+                  when "rw" then FV1::WRITE | FV1::READ
+                  when "a"  then FV1::APPEND | FV1::WRITE | FV1::CREAT
+                  else raise ArgumentError, "unsupported mode #{mode.inspect}"
           end
 
           channel.sends_packet(FXP_OPEN, :long, 0, :string, path, :long, flags, *attrs)

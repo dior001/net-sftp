@@ -1,11 +1,15 @@
-module Net; module SFTP; module Protocol; module V01
+# frozen_string_literal: true
 
+module Net; module SFTP; module Protocol; module V01
   # Represents a single named item on the remote server. This includes the
   # name, attributes about the item, and the "longname", which is intended
   # for use when displaying directory data, and has no specified format.
   class Name
-    # The name of the item on the remote server.
-    attr_reader :name
+    # The name of the item on the remote server. Writable so that
+    # Net::SFTP::Operations::Dir#glob can rewrite it to a path relative to
+    # the directory it started searching from, as it descends into
+    # subdirectories.
+    attr_accessor :name
 
     # The display-ready name of the item, possibly with other attributes.
     attr_reader :longname
@@ -15,7 +19,9 @@ module Net; module SFTP; module Protocol; module V01
 
     # Create a new Name object with the given name, longname, and attributes.
     def initialize(name, longname, attributes)
-      @name, @longname, @attributes = name, longname, attributes
+      @name = name
+      @longname = longname
+      @attributes = attributes
     end
 
     # Returns +true+ if the item appears to be a directory. It does this by
@@ -39,5 +45,4 @@ module Net; module SFTP; module Protocol; module V01
       attributes.file?
     end
   end
-
 end; end; end; end

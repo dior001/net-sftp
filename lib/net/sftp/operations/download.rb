@@ -1,7 +1,8 @@
-require 'net/ssh/loggable'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
 
 module Net; module SFTP; module Operations
-
   # A general purpose downloader module for Net::SFTP. It can download files
   # into IO objects, or directly to files on the local file system. It can
   # even download entire directory trees via SFTP, and provides a flexible
@@ -119,6 +120,10 @@ module Net; module SFTP; module Operations
   class Download
     include Net::SSH::Loggable
 
+    # The special "current directory" and "parent directory" entries that
+    # every SFTP directory listing includes, and which are never downloaded.
+    RELATIVE_ENTRY_NAMES = [".", ".."].freeze
+
     # The destination of the download (the name of a file or directory on
     # the local server, or an IO object)
     attr_reader :local
@@ -144,7 +149,7 @@ module Net; module SFTP; module Operations
     #
     # This will return immediately, and requires that the SSH event loop be
     # run in order to effect the download. (See #wait.)
-    def initialize(sftp, local, remote, options={}, &progress)
+    def initialize(sftp, local, remote, options = {}, &progress)
       @sftp = sftp
       @local = local
       @remote = remote
@@ -155,9 +160,7 @@ module Net; module SFTP; module Operations
 
       self.logger = sftp.logger
 
-      if recursive? && local.respond_to?(:write)
-        raise ArgumentError, "cannot download a directory tree in-memory"
-      end
+      raise ArgumentError, "cannot download a directory tree in-memory" if recursive? && local.respond_to?(:write)
 
       @stack = [Entry.new(remote, local, recursive?)]
       process_next_entry
@@ -172,7 +175,7 @@ module Net; module SFTP; module Operations
     # Returns true if there are any active requests or pending files or
     # directories.
     def active?
-      @active > 0 || stack.any?
+      @active.positive? || stack.any?
     end
 
     # Forces the transfer to stop.
@@ -204,7 +207,8 @@ module Net; module SFTP; module Operations
 
       # A simple struct for encapsulating information about a single remote
       # file or directory that needs to be downloaded.
-      Entry = Struct.new(:remote, :local, :directory, :size, :handle, :offset, :sink)
+      Entry = Struct.new(:remote, :local, :directory, :size, :handle, :offset, :sink) # rubocop:disable Lint/StructNewOverride -- :size is meant as this entry's byte size, not Struct#size (member count); nothing here relies on the latter
+      private_constant :Entry
 
       #--
       # "ruby -w" hates private attributes, so we have to do these longhand
@@ -212,13 +216,14 @@ module Net; module SFTP; module Operations
 
       # The stack of Entry instances, indicating which files and directories
       # on the remote host remain to be downloaded.
-      def stack; @stack; end
+      attr_reader :stack
 
       # The progress handler for this instance. Possibly nil.
-      def progress; @progress; end
+      attr_reader :progress
 
       # The default read size.
       DEFAULT_READ_SIZE = 32_000
+      private_constant :DEFAULT_READ_SIZE
 
       # The number of bytes to read at a time from remote files.
       def read_size
@@ -248,7 +253,7 @@ module Net; module SFTP; module Operations
           end
         end
 
-        update_progress(:finish) if !active?
+        update_progress(:finish) unless active?
       end
 
       # Called when a remote directory is "opened" for reading, e.g. to
@@ -256,7 +261,8 @@ module Net; module SFTP; module Operations
       # operation was successful.
       def on_opendir(response)
         entry = response.request[:entry]
-        raise  StatusException.new(response, "opendir #{entry.remote}") unless response.ok?
+        raise StatusException.new(response, "opendir #{entry.remote}") unless response.ok?
+
         entry.handle = response[:handle]
         request = sftp.readdir(response[:handle], &method(:on_readdir))
         request[:parent] = entry
@@ -274,8 +280,10 @@ module Net; module SFTP; module Operations
           raise StatusException.new(response, "readdir #{entry.remote}")
         else
           response[:names].each do |item|
-            next if item.name == "." || item.name == ".."
-            stack << Entry.new(::File.join(entry.remote, item.name), ::File.join(entry.local, item.name), item.directory?, item.attributes.size)
+            next if RELATIVE_ENTRY_NAMES.include?(item.name)
+
+            stack << Entry.new(::File.join(entry.remote, item.name), ::File.join(entry.local, item.name), item.directory?,
+                               item.attributes.size)
           end
 
           # take this opportunity to enqueue more requests
@@ -298,6 +306,7 @@ module Net; module SFTP; module Operations
         @active -= 1
         entry = response.request[:parent]
         raise StatusException.new(response, "close #{entry.remote}") unless response.ok?
+
         process_next_entry
       end
 
@@ -347,6 +356,7 @@ module Net; module SFTP; module Operations
         @active -= 1
         entry = response.request[:entry]
         raise StatusException.new(response, "close #{entry.remote}") unless response.ok?
+
         process_next_entry
       end
 
@@ -361,5 +371,4 @@ module Net; module SFTP; module Operations
         end
       end
   end
-
 end; end; end

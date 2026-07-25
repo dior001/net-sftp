@@ -15,7 +15,12 @@ Gem::Specification.new do |spec|
   spec.description   = %q{A pure Ruby implementation of the SFTP client protocol}
   spec.homepage      = "https://github.com/net-ssh/net-sftp"
   spec.license       = "MIT"
-  spec.required_rubygems_version = Gem::Requirement.new(">= 0") if spec.respond_to? :required_rubygems_version=
+  spec.required_ruby_version = ">= 3.1"
+
+  spec.metadata["homepage_uri"] = spec.homepage
+  spec.metadata["source_code_uri"] = spec.homepage
+  spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/master/CHANGES.txt"
+  spec.metadata["rubygems_mfa_required"] = "true"
 
   spec.extra_rdoc_files = [
     "LICENSE.txt",
@@ -27,22 +32,10 @@ Gem::Specification.new do |spec|
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  if spec.respond_to? :specification_version then
-    spec.specification_version = 3
+  spec.add_dependency "net-ssh", ">= 5.0.0", "< 8.0.0"
 
-    if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
-      spec.add_runtime_dependency(%q<net-ssh>, [">= 5.0.0", "< 8.0.0"])
-      spec.add_development_dependency(%q<minitest>, [">= 5"])
-      spec.add_development_dependency(%q<mocha>, [">= 0"])
-    else
-      spec.add_dependency(%q<net-ssh>, [">= 5.0.0", "< 8.0.0"])
-      spec.add_dependency(%q<minitest>, [">= 5"])
-      spec.add_dependency(%q<mocha>, [">= 0"])
-    end
-  else
-    spec.add_dependency(%q<net-ssh>, [">= 5.0.0", "< 8.0.0"])
-    spec.add_dependency(%q<minitest>, [">= 5"])
-    spec.add_dependency(%q<test-unit>, [">= 0"])
-    spec.add_dependency(%q<mocha>, [">= 0"])
-  end
+  spec.add_development_dependency "minitest", "~> 5.15"
+  spec.add_development_dependency "mocha", "~> 3.1"
+  spec.add_development_dependency "rake", "~> 13.0"
+  spec.add_development_dependency "simplecov", "~> 0.22"
 end

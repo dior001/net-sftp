@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "common"
 
 class DownloadTest < Net::SFTP::TestCase
@@ -19,6 +21,36 @@ class DownloadTest < Net::SFTP::TestCase
 
     assert_scripted_command { sftp.download(remote, local) }
     assert_equal text, file.string
+  end
+
+  def test_download_bang_should_block_until_transfer_completes
+    local = "/path/to/local"
+    remote = "/path/to/remote"
+    text = "this is some text\n"
+
+    expect_file_transfer(remote, text)
+
+    file = StringIO.new
+    File.stubs(:open).with(local, "wb").returns(file)
+
+    result = nil
+    assert_scripted_command { result = sftp.download!(remote, local) }
+
+    assert_instance_of Net::SFTP::Operations::Download, result
+    refute_predicate result, :active?
+    assert_equal text, file.string
+  end
+
+  def test_download_bang_without_local_should_return_contents_as_a_string
+    remote = "/path/to/remote"
+    text = "this is some text\n"
+
+    expect_file_transfer(remote, text)
+
+    result = nil
+    assert_scripted_command { result = sftp.download!(remote) }
+
+    assert_equal text, result
   end
 
   def test_download_file_should_transfer_remote_to_local_in_spite_of_fragmentation
@@ -75,7 +107,7 @@ class DownloadTest < Net::SFTP::TestCase
     assert_equal text, file.string
 
     assert_progress_reported_open :remote => "/path/to/remote"
-    assert_progress_reported_get     0, 1024
+    assert_progress_reported_get 0, 1024
     assert_progress_reported_get  1024, 1024
     assert_progress_reported_get  2048, 1024
     assert_progress_reported_get  3072, 1024
@@ -144,9 +176,197 @@ class DownloadTest < Net::SFTP::TestCase
     end
   end
 
+  def test_download_file_with_progress_handler_should_report_progress
+    remote = "/path/to/remote"
+    text = "this is some text\n"
+    expect_file_transfer(remote, text)
+
+    local = StringIO.new
+
+    assert_scripted_command do
+      sftp.download(remote, local, :progress => ProgressHandler.new(@progress))
+    end
+
+    assert_progress_reported_open(:remote => remote)
+    assert_progress_reported_close
+    assert_progress_reported_finish
+    assert_no_more_reported_events
+  end
+
+  def test_download_directory_should_not_create_local_directory_when_it_already_exists
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPENDIR, :long, 0, :string, remote)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "dir1")
+      channel.sends_packet(FXP_READDIR, :long, 1, :string, "dir1")
+      channel.gets_packet(FXP_STATUS, :long, 1, :long, 1)
+      channel.sends_packet(FXP_CLOSE, :long, 2, :string, "dir1")
+      channel.gets_packet(FXP_STATUS, :long, 2, :long, 0)
+    end
+
+    File.stubs(:directory?).with(local).returns(true)
+    Dir.expects(:mkdir).never
+
+    assert_scripted_command { sftp.download(remote, local, :recursive => true) }
+  end
+
+  def test_download_directory_should_raise_status_exception_when_closedir_fails
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPENDIR, :long, 0, :string, remote)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "dir1")
+      channel.sends_packet(FXP_READDIR, :long, 1, :string, "dir1")
+      channel.gets_packet(FXP_STATUS, :long, 1, :long, 1)
+      channel.sends_packet(FXP_CLOSE, :long, 2, :string, "dir1")
+      channel.gets_packet(FXP_STATUS, :long, 2, :long, 4)
+    end
+
+    File.stubs(:directory?).with(local).returns(false)
+    Dir.stubs(:mkdir).with(local)
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.download(remote, local, :recursive => true) }
+    end
+  end
+
+  def test_download_directory_should_raise_status_exception_when_opendir_fails
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPENDIR, :long, 0, :string, remote)
+      channel.gets_packet(FXP_STATUS, :long, 0, :long, 4)
+    end
+
+    File.stubs(:directory?).with(local).returns(false)
+    Dir.stubs(:mkdir).with(local)
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.download(remote, local, :recursive => true) }
+    end
+  end
+
+  def test_download_file_should_raise_status_exception_when_open_fails
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPEN, :long, 0, :string, remote, :long, 0x01, :long, 0)
+      channel.gets_packet(FXP_STATUS, :long, 0, :long, 4)
+    end
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.download(remote, local) }
+    end
+  end
+
+  def test_download_file_should_raise_status_exception_when_close_fails
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+    text = "this is some text\n"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPEN, :long, 0, :string, remote, :long, 0x01, :long, 0)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
+      channel.sends_packet(FXP_READ, :long, 1, :string, "handle", :int64, 0, :long, 32_000)
+      channel.gets_packet(FXP_DATA, :long, 1, :string, text)
+      channel.sends_packet(FXP_READ, :long, 2, :string, "handle", :int64, text.bytesize, :long, 32_000)
+      channel.gets_packet(FXP_STATUS, :long, 2, :long, 1)
+      channel.sends_packet(FXP_CLOSE, :long, 3, :string, "handle")
+      channel.gets_packet(FXP_STATUS, :long, 3, :long, 4)
+    end
+
+    file = StringIO.new
+    File.stubs(:open).with(local, "wb").returns(file)
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.download(remote, local) }
+    end
+  end
+
+  def test_download_directory_should_raise_status_exception_when_readdir_fails
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPENDIR, :long, 0, :string, remote)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "dir1")
+      channel.sends_packet(FXP_READDIR, :long, 1, :string, "dir1")
+      channel.gets_packet(FXP_STATUS, :long, 1, :long, 4)
+    end
+
+    File.stubs(:directory?).with(local).returns(false)
+    Dir.stubs(:mkdir).with(local)
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.download(remote, local, :recursive => true) }
+    end
+  end
+
+  def test_download_file_should_raise_status_exception_when_read_fails
+    remote = "/path/to/remote"
+    local = "/path/to/local"
+
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPEN, :long, 0, :string, remote, :long, 0x01, :long, 0)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
+      channel.sends_packet(FXP_READ, :long, 1, :string, "handle", :int64, 0, :long, 32_000)
+      channel.gets_packet(FXP_STATUS, :long, 1, :long, 4)
+    end
+
+    File.stubs(:open).with(local, "wb").returns(StringIO.new)
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.download(remote, local) }
+    end
+  end
+
+  def test_abort_bang_should_clear_active_state_and_pending_entries
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote").returns(request)
+
+    downloader = Net::SFTP::Operations::Download.new(sftp, StringIO.new, "/path/to/remote")
+    assert_predicate downloader, :active?
+
+    downloader.abort!
+    refute_predicate downloader, :active?
+  end
+
+  def test_wait_should_run_the_sftp_event_loop_until_finished
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote").returns(request)
+    sftp.expects(:loop)
+
+    downloader = Net::SFTP::Operations::Download.new(sftp, StringIO.new, "/path/to/remote")
+    assert_equal downloader, downloader.wait
+  end
+
+  def test_property_accessors_should_read_and_write_named_properties
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote").returns(request)
+
+    downloader = Net::SFTP::Operations::Download.new(sftp, StringIO.new, "/path/to/remote")
+    assert_nil downloader[:foo]
+    downloader[:foo] = "bar"
+    assert_equal "bar", downloader[:foo]
+  end
+
   private
 
-    def expect_file_transfer(remote, text, opts={})
+    def expect_file_transfer(remote, text, opts = {})
       expect_sftp_session :server_version => 3 do |channel|
         channel.sends_packet(FXP_OPEN, :long, 0, :string, remote, :long, 0x01, :long, 0)
         channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
@@ -166,12 +386,13 @@ class DownloadTest < Net::SFTP::TestCase
         offset = 0
         data_packet_count = (text.bytesize / FXP_DATA_CHUNK_SIZE.to_f).ceil
         data_packet_count.times do |n|
-          payload = text[n*FXP_DATA_CHUNK_SIZE,FXP_DATA_CHUNK_SIZE]
-          channel.sends_packet(FXP_READ, :long, n+1, :string, "handle", :int64, offset, :long, requested_chunk_size)
+          payload = text[n * FXP_DATA_CHUNK_SIZE, FXP_DATA_CHUNK_SIZE]
+          channel.sends_packet(FXP_READ, :long, n + 1, :string, "handle", :int64, offset, :long, requested_chunk_size)
           offset += payload.bytesize
-          channel.gets_packet(FXP_DATA, :long, n+1, :string, payload)
+          channel.gets_packet(FXP_DATA, :long, n + 1, :string, payload)
         end
-        channel.sends_packet(FXP_READ, :long, data_packet_count + 1, :string, "handle", :int64, offset, :long, requested_chunk_size)
+        channel.sends_packet(FXP_READ, :long, data_packet_count + 1, :string, "handle", :int64, offset, :long,
+                             requested_chunk_size)
         channel.gets_packet(FXP_STATUS, :long, data_packet_count + 1, :long, 1)
         channel.sends_packet(FXP_CLOSE, :long, data_packet_count + 2, :string, "handle")
         channel.gets_packet(FXP_STATUS, :long, data_packet_count + 2, :long, 0)
@@ -180,7 +401,7 @@ class DownloadTest < Net::SFTP::TestCase
       file = StringIO.new
       File.stubs(:open).with(local, "wb").returns(file)
 
-      return file
+      file
     end
 
     # 0:OPENDIR(remote) ->
@@ -225,10 +446,10 @@ class DownloadTest < Net::SFTP::TestCase
 
         channel.sends_packet(FXP_READDIR, :long, 1, :string, "dir1")
         channel.gets_packet(FXP_NAME, :long, 1, :long, 4,
-          :string, "..",      :string, "drwxr-xr-x  4 bob bob  136 Aug  1 ..", :long, 0x04, :long, 040755,
-          :string, ".",       :string, "drwxr-xr-x  4 bob bob  136 Aug  1 .", :long, 0x04, :long, 040755,
-          :string, "subdir1", :string, "drwxr-xr-x  4 bob bob  136 Aug  1 subdir1", :long, 0x04, :long, 040755,
-          :string, "file1",   :string, "-rw-rw-r--  1 bob bob  100 Aug  1 file1", :long, 0x04, :long, 0100644)
+                            :string, "..",      :string, "drwxr-xr-x  4 bob bob  136 Aug  1 ..", :long, 0x04, :long, 0o40755,
+                            :string, ".",       :string, "drwxr-xr-x  4 bob bob  136 Aug  1 .", :long, 0x04, :long, 0o40755,
+                            :string, "subdir1", :string, "drwxr-xr-x  4 bob bob  136 Aug  1 subdir1", :long, 0x04, :long, 0o40755,
+                            :string, "file1",   :string, "-rw-rw-r--  1 bob bob  100 Aug  1 file1", :long, 0x04, :long, 0o100644)
 
         channel.sends_packet(FXP_OPENDIR, :long, 2, :string, File.join(remote, "subdir1"))
         channel.sends_packet(FXP_OPEN, :long, 3, :string, File.join(remote, "file1"), :long, 0x01, :long, 0)
@@ -244,9 +465,9 @@ class DownloadTest < Net::SFTP::TestCase
         channel.sends_packet(FXP_CLOSE, :long, 7, :string, "dir1")
 
         channel.gets_packet(FXP_NAME, :long, 5, :long, 3,
-          :string, "..",    :string, "drwxr-xr-x  4 bob bob  136 Aug  1 ..", :long, 0x04, :long, 040755,
-          :string, ".",     :string, "drwxr-xr-x  4 bob bob  136 Aug  1 .", :long, 0x04, :long, 040755,
-          :string, "file2", :string, "-rw-rw-r--  1 bob bob  100 Aug  1 file2", :long, 0x04, :long, 0100644)
+                            :string, "..",    :string, "drwxr-xr-x  4 bob bob  136 Aug  1 ..", :long, 0x04, :long, 0o40755,
+                            :string, ".",     :string, "drwxr-xr-x  4 bob bob  136 Aug  1 .", :long, 0x04, :long, 0o40755,
+                            :string, "file2", :string, "-rw-rw-r--  1 bob bob  100 Aug  1 file2", :long, 0x04, :long, 0o100644)
 
         channel.sends_packet(FXP_OPEN, :long, 8, :string, File.join(remote, "subdir1", "file2"), :long, 0x01, :long, 0)
         channel.sends_packet(FXP_READDIR, :long, 9, :string, "dir2")

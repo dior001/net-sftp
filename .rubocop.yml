@@ -1,0 +1,185 @@
+plugins:
+  - rubocop-performance
+  - rubocop-minitest
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.1
+  SuggestExtensions: false
+  Exclude:
+    - "pkg/**/*"
+    - "coverage/**/*"
+    - "vendor/**/*"
+
+# This gem hand-implements the wire format for six revisions of the SFTP
+# protocol side by side (lib/net/sftp/protocol/{01..06}). The resulting
+# packet-building and state-machine methods are inherently longer/more
+# branchy than typical application code; splitting them up to satisfy
+# arbitrary size limits would make the protocol logic harder to follow, not
+# easier, so the size-oriented Metrics cops are disabled rather than tuned.
+Metrics:
+  Enabled: false
+
+# The whole codebase opens each file with a compact, semicolon-joined
+# `module Net; module SFTP; ...` header (and closes it the same way, e.g.
+# `end; end; end`), and indents method bodies nested under
+# `private`/`protected` one extra level. All of this predates RuboCop and is
+# applied consistently, so we honor it rather than reformatting every file.
+# Style/TrailingBodyOnModule is the cop that actually splits a compact
+# `module A; module B ...` header into separate lines; with it enabled,
+# autocorrect repeatedly mis-indents the split lines because
+# Layout/IndentationWidth/Consistency (needed to fix that indentation back
+# up) are themselves disabled below to preserve the private/protected
+# convention. Disabling all three together avoids autocorrect corrupting
+# these headers — verified while preparing this config.
+Layout/IndentationWidth:
+  Enabled: false
+Layout/IndentationConsistency:
+  Enabled: false
+Style/TrailingBodyOnModule:
+  Enabled: false
+Style/TrailingBodyOnClass:
+  Enabled: false
+
+# Companion to the above: files close their compact module header with a
+# matching compact `end; end; end` footer. The actual cop that tears this
+# apart under autocorrect is Layout/EndAlignment: it wants each `end` at
+# the source column of its corresponding `module` keyword, and since three
+# modules opened on one line have three different columns, "fixing" that
+# forces the single `end; end; end` line to be split into three
+# differently-indented lines — a "staircase" that doesn't match the
+# (still one-line) header above it. Disabled for the same reason as the
+# indentation cops above: verified while preparing this config.
+Style/Semicolon:
+  Enabled: false
+Layout/EndAlignment:
+  Enabled: false
+
+# A handful of `x = if cond ... else ... end` expression-assignments in the
+# protocol drivers hand-align `else`/`end` with the body rather than with
+# `if`; this cop's autocorrect fights that (see Layout/EndAlignment above
+# for the same class of issue) and was observed re-breaking a manual fix.
+Layout/ElseAlignment:
+  Enabled: false
+
+# `$\` (the output record separator global) ending a line is repeatedly
+# misdetected by this cop as a line-continuation backslash needing a space
+# before it; autocorrecting it corrupts `$\` into `$` followed by an actual
+# line continuation, which is a syntax error. Verified while preparing this
+# config; disabling this low-value cop is far safer than fighting it.
+Layout/LineContinuationSpacing:
+  Enabled: false
+
+# String literals are a roughly even mix of single- and double-quoted
+# throughout the existing code; standardize on double quotes since that is
+# the more common choice in this codebase.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# Both `foo(:bar => 1)` (hash-rocket) and `foo(bar: 1)` (modern shorthand)
+# appear throughout, call site by call site. Forcing a single style would
+# mean rewriting hundreds of pre-existing hash-rocket call sites across the
+# protocol drivers for no functional benefit.
+Style/HashSyntax:
+  Enabled: false
+
+# Documentation follows RDoc conventions (a comment directly above each
+# class/module), which this cop does not recognize as satisfying it in
+# every nesting style used here (e.g. `module Net; module SFTP`).
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+# This is a protocol library implementing legacy wire formats; permission
+# bits, protocol version numbers, and packet type codes are inherent to the
+# domain, not "magic numbers" to be named away.
+Style/NumericLiterals:
+  Enabled: false
+Lint/NumberConversion:
+  Enabled: false
+
+Naming/MethodParameterName:
+  MinNameLength: 2
+  AllowedNames:
+    - n
+    - m
+
+Layout/LineLength:
+  Max: 130
+
+# %w(...) is the prevailing style already used throughout lib/ and test/;
+# keep it rather than rewriting every literal to %w[...].
+Style/PercentLiteralDelimiters:
+  PreferredDelimiters:
+    "%w": ()
+    "%i": ()
+
+# The test suite is largely integration-style: a single test scripts a
+# realistic SFTP exchange (open/write/close, or a whole directory walk) and
+# then asserts on each step of the resulting state. That naturally means
+# more than 3 assertions per test; splitting these up would mean re-running
+# the same expensive scripted exchange multiple times for no real gain in
+# clarity.
+Minitest/MultipleAssertions:
+  Enabled: false
+
+# A purely cosmetic preference; not worth reformatting ~500 call sites for.
+Minitest/EmptyLineBeforeAssertionMethods:
+  Enabled: false
+
+# `class Protocol::V01::Base` vs `module Protocol; module V01; class Base`
+# is the same compact-vs-nested tension as the module headers above, applied
+# to test class definitions.
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+# The SFTP state machines (Session, Upload, Download) pass bound method
+# objects as callbacks throughout — `sftp.open(path, &method(:on_open))` is
+# the core idiom every operation is built on. Converting ~15 call sites to
+# explicit blocks for a minor performance cop would touch the heart of the
+# protocol driver for no behavioral benefit.
+Performance/MethodObjectAsBlock:
+  Enabled: false
+
+# Net::SFTP::Operations::File intentionally mirrors IO's classic interface,
+# including its use of $/ and $\ (see its #gets and #print) — the point is
+# that it's a drop-in substitute for IO, so the $/-style globals are the
+# right choice here, not the English library's named aliases.
+Style/SpecialGlobalVars:
+  Enabled: false
+
+# Session#sftp(wait = true), #symlink(path, target, symlink = true), etc.
+# are existing public API; switching their trailing boolean to a required
+# keyword argument would break every positional caller (including this
+# gem's own README examples). Not worth the compatibility break for a
+# style preference.
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+# `raise SomeError.new(a, b)` appears throughout for exception classes with
+# multi-argument initializers (e.g. StatusException.new(response, text)),
+# which the suggested `raise SomeError, message` form cannot express (that
+# form passes a single value to `.exception`). Enforcing it only for the
+# handful of single-argument call sites would make the codebase less
+# consistent, not more.
+Style/RaiseArgs:
+  Enabled: false
+
+# `0 < fragment_len && fragment_len < whole_packet.length` is a deliberate
+# "sandwich" range check; reversing only the first half to satisfy this cop
+# would make the upper/lower bounds harder to see at a glance.
+Style/YodaCondition:
+  Enabled: false
+
+# Test method names spell out the exact constant/acronym under test (e.g.
+# `test_ok_should_be_true_when_code_is_FX_OK`, `..._should_accept_IO_constants`)
+# so the method name doubles as documentation of what's being asserted.
+Naming/MethodName:
+  Exclude:
+    - "test/**/*"

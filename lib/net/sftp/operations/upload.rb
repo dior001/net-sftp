@@ -1,7 +1,8 @@
-require 'net/ssh/loggable'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
 
 module Net; module SFTP; module Operations
-
   # A general purpose uploader module for Net::SFTP. It can upload IO objects,
   # files, and even entire directory trees via SFTP, and provides a flexible
   # progress reporting mechanism.
@@ -117,6 +118,13 @@ module Net; module SFTP; module Operations
   class Upload
     include Net::SSH::Loggable
 
+    # The special "current directory" and "parent directory" entries that
+    # every local directory listing includes, and which are never uploaded.
+    RELATIVE_ENTRY_NAMES = %w(. ..).freeze
+
+    # The default # of bytes to read from disk at a time.
+    DEFAULT_READ_SIZE = 32_000
+
     # The source of the upload (on the local server)
     attr_reader :local
 
@@ -140,7 +148,7 @@ module Net; module SFTP; module Operations
     #
     # This will return immediately, and requires that the SSH event loop be
     # run in order to effect the upload. (See #wait.)
-    def initialize(sftp, local, remote, options={}, &progress) #:nodoc:
+    def initialize(sftp, local, remote, options = {}, &progress) # :nodoc:
       @sftp = sftp
       @local = local
       @remote = remote
@@ -164,6 +172,7 @@ module Net; module SFTP; module Operations
           sftp.mkdir(remote) do |response|
             @active -= 1
             raise StatusException.new(response, "mkdir `#{remote}'") unless response.ok?
+
             (options[:requests] || RECURSIVE_READERS).to_i.times do
               break unless process_next_entry
             end
@@ -174,6 +183,7 @@ module Net; module SFTP; module Operations
         end
       else
         raise ArgumentError, "expected a file to upload" unless local.respond_to?(:read) || ::File.exist?(local)
+
         @stack = [[local]]
         process_next_entry
       end
@@ -188,7 +198,7 @@ module Net; module SFTP; module Operations
     # Returns true if the uploader is currently running. When this is false,
     # the uploader has finished processing.
     def active?
-      @active > 0 || @stack.any?
+      @active.positive? || @stack.any?
     end
 
     # Forces the transfer to stop.
@@ -223,24 +233,24 @@ module Net; module SFTP; module Operations
       #++
 
       # The progress handler for this instance. Possibly nil.
-      def progress; @progress; end
+      attr_reader :progress
 
       # A simple struct for recording metadata about the file currently being
       # uploaded.
-      LiveFile = Struct.new(:local, :remote, :io, :size, :handle)
-
-      # The default # of bytes to read from disk at a time.
-      DEFAULT_READ_SIZE   = 32_000
+      LiveFile = Struct.new(:local, :remote, :io, :size, :handle) # rubocop:disable Lint/StructNewOverride -- :size is meant as this file's byte size, not Struct#size (member count); nothing here relies on the latter
+      private_constant :LiveFile
 
       # The number of readers to use when uploading a single file.
       SINGLE_FILE_READERS = 2
+      private_constant :SINGLE_FILE_READERS
 
       # The number of readers to use when uploading a directory.
-      RECURSIVE_READERS   = 16
+      RECURSIVE_READERS = 16
+      private_constant :RECURSIVE_READERS
 
       # Examines the stack and determines what action to take. This is the
       # starting point of the state machine.
-      def process_next_entry
+      def process_next_entry # rubocop:disable Naming/PredicateMethod -- the boolean return only signals "was there more to process" to the caller's loop; this drives a state machine, not a query
         if @stack.empty?
           if @uploads.any?
             write_next_chunk(@uploads.first)
@@ -273,7 +283,7 @@ module Net; module SFTP; module Operations
         else
           open_file(@stack.pop.first, remote)
         end
-        return true
+        true
       end
 
       # Prepares to send +local+ to +remote+.
@@ -284,14 +294,14 @@ module Net; module SFTP; module Operations
           file = local
           name = options[:name] || "<memory>"
         else
-          file = ::File.open(local, "rb")
+          file = ::File.open(local, "rb") # rubocop:disable Style/FileOpen -- must stay open across many #write_next_chunk calls over the async event loop; it is explicitly closed in #write_next_chunk once EOF is reached
           name = local
         end
 
-        if file.respond_to?(:stat)
-          size = file.stat.size
+        size = if file.respond_to?(:stat)
+          file.stat.size
         else
-          size = file.size
+          file.size
         end
 
         metafile = LiveFile.new(name, remote, file, size)
@@ -325,9 +335,9 @@ module Net; module SFTP; module Operations
         @uploads << file
         write_next_chunk(file)
 
-        if !recursive?
+        return if recursive?
+
           (options[:requests] || SINGLE_FILE_READERS).to_i.times { write_next_chunk(file) }
-        end
       end
 
       # Called when a +write+ request finishes. Raises StatusException if the
@@ -337,6 +347,7 @@ module Net; module SFTP; module Operations
         @active -= 1
         file = response.request[:file]
         raise StatusException.new(response, "write #{file.remote}") unless response.ok?
+
         write_next_chunk(file)
       end
 
@@ -347,6 +358,7 @@ module Net; module SFTP; module Operations
         @active -= 1
         file = response.request[:file]
         raise StatusException.new(response, "close #{file.remote}") unless response.ok?
+
         process_next_entry
       end
 
@@ -377,7 +389,7 @@ module Net; module SFTP; module Operations
       # Returns all directory entries for the given path, removing the '.'
       # and '..' relative paths.
       def entries_for(local)
-        ::Dir.entries(local).reject { |v| %w(. ..).include?(v) }
+        ::Dir.entries(local).reject { |v| RELATIVE_ENTRY_NAMES.include?(v) }
       end
 
       # Attempts to notify the progress monitor (if one was given) about
@@ -391,5 +403,4 @@ module Net; module SFTP; module Operations
         end
       end
   end
-
 end; end; end

@@ -1,5 +1,7 @@
-require 'common'
-require 'protocol/01/test_base'
+# frozen_string_literal: true
+
+require "common"
+require "protocol/01/test_base"
 
 class Protocol::V02::TestBase < Protocol::V01::TestBase
   def test_version

@@ -1,16 +1,29 @@
-require 'common'
+# frozen_string_literal: true
+
+require "common"
 
 class FileOperationsTest < Net::SFTP::TestCase
   def setup
     @sftp = mock("sftp")
     @file = Net::SFTP::Operations::File.new(@sftp, "handle")
-    @save_dollar_fslash, $/ = $/, "\n"
-    @save_dollar_bslash, $\ = $\, nil
+    # Net::SFTP::Operations::File#gets and #print intentionally mirror
+    # IO#gets/IO#print, which default to $/ and $\. Ruby deprecates
+    # assigning non-nil values to those globals, but the assignment itself
+    # (not the resulting behavior) is what triggers the warning, so it is
+    # silenced only for the duration of this test-isolation shim.
+    with_deprecation_warnings_silenced do
+      @save_dollar_fslash = $/
+      $/ = "\n"
+      @save_dollar_bslash = $\
+      $\ = nil
+    end
   end
 
   def teardown
-    $/ = @save_dollar_fslash
-    $\ = @save_dollar_bslash
+    with_deprecation_warnings_silenced do
+      $/ = @save_dollar_fslash
+      $\ = @save_dollar_bslash
+    end
   end
 
   def test_pos_assignment_should_set_position
@@ -20,11 +33,11 @@ class FileOperationsTest < Net::SFTP::TestCase
 
   def test_pos_assignment_should_reset_eof
     @sftp.expects(:read!).with("handle", 0, 8192).returns(nil)
-    assert !@file.eof?
+    refute_predicate @file, :eof?
     @file.read
-    assert @file.eof?
+    assert_predicate @file, :eof?
     @file.pos = 0
-    assert !@file.eof?
+    refute_predicate @file, :eof?
   end
 
   def test_close_should_close_handle_and_set_handle_to_nil
@@ -37,13 +50,13 @@ class FileOperationsTest < Net::SFTP::TestCase
   def test_eof_should_be_false_if_at_eof_but_data_remains_in_buffer
     @sftp.expects(:read!).returns("hello world", nil)
     @file.read(1)
-    assert !@file.eof?
+    refute_predicate @file, :eof?
   end
 
   def test_eof_should_be_true_if_at_eof_and_no_data_in_buffer
     @sftp.expects(:read!).times(2).returns("hello world", nil)
     @file.read
-    assert @file.eof?
+    assert_predicate @file, :eof?
   end
 
   def test_read_without_argument_should_read_and_return_remainder_of_file_and_set_pos
@@ -88,13 +101,13 @@ class FileOperationsTest < Net::SFTP::TestCase
   def test_gets_when_no_such_delimiter_exists_in_stream_should_read_to_EOF
     @sftp.expects(:read!).times(2).returns("hello world\ngoodbye world\n\nfarewell!\n", nil)
     assert_equal "hello world\ngoodbye world\n\nfarewell!\n", @file.gets("X")
-    assert @file.eof?
+    assert_predicate @file, :eof?
   end
 
   def test_gets_when_nil_delimiter_should_fread_to_EOF
     @sftp.expects(:read!).times(2).returns("hello world\ngoodbye world\n\nfarewell!\n", nil)
     assert_equal "hello world\ngoodbye world\n\nfarewell!\n", @file.gets(nil)
-    assert @file.eof?
+    assert_predicate @file, :eof?
   end
 
   def test_gets_with_integer_argument_should_read_number_of_bytes
@@ -125,7 +138,7 @@ class FileOperationsTest < Net::SFTP::TestCase
   def test_gets_at_EOF_should_return_nil
     @sftp.expects(:read!).returns(nil)
     assert_nil @file.gets
-    assert @file.eof?
+    assert_predicate @file, :eof?
   end
 
   def test_readline_should_raise_exception_on_EOF
@@ -133,12 +146,17 @@ class FileOperationsTest < Net::SFTP::TestCase
     assert_raises(EOFError) { @file.readline }
   end
 
+  def test_readline_should_return_line_when_data_is_available
+    @sftp.expects(:read!).returns("hello world\ngoodbye world\n")
+    assert_equal "hello world\n", @file.readline
+  end
+
   def test_rewind_should_reset_to_beginning_of_file
     @sftp.expects(:read!).times(2).returns("hello world", nil)
     @file.read
-    assert @file.eof?
+    assert_predicate @file, :eof?
     @file.rewind
-    assert !@file.eof?
+    refute_predicate @file, :eof?
     assert_equal 0, @file.pos
   end
 
@@ -178,7 +196,7 @@ class FileOperationsTest < Net::SFTP::TestCase
   end
 
   def test_print_with_no_arguments_should_write_dollar_bslash_if_dollar_bslash_is_not_nil
-    $\ = "-"
+    with_deprecation_warnings_silenced { $\ = "-" }
     @sftp.expects(:write!).with("handle", 0, "-")
     @file.print
   end
@@ -192,8 +210,8 @@ class FileOperationsTest < Net::SFTP::TestCase
 
   def test_puts_should_recursively_puts_array_arguments
     10.times do |i|
-      @sftp.expects(:write!).with("handle", i*2, i.to_s)
-      @sftp.expects(:write!).with("handle", i*2+1, "\n")
+      @sftp.expects(:write!).with("handle", i * 2, i.to_s)
+      @sftp.expects(:write!).with("handle", (i * 2) + 1, "\n")
     end
     @file.puts 0, [1, [2, 3], 4, [5, [6, 7, 8]]], 9
   end
@@ -217,5 +235,15 @@ class FileOperationsTest < Net::SFTP::TestCase
     stat = stub(size: 1024)
     @sftp.expects(:fstat!).with("handle").returns(stat)
     assert_equal 1024, @file.size
+  end
+
+  private
+
+  def with_deprecation_warnings_silenced
+    original = Warning[:deprecated]
+    Warning[:deprecated] = false
+    yield
+  ensure
+    Warning[:deprecated] = original
   end
 end

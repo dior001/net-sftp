@@ -1,5 +1,7 @@
-require 'common'
-require 'protocol/04/test_base'
+# frozen_string_literal: true
+
+require "common"
+require "protocol/04/test_base"
 
 class Protocol::V05::TestBase < Protocol::V04::TestBase
   include Net::SFTP::Constants::OpenFlags
@@ -23,25 +25,26 @@ class Protocol::V05::TestBase < Protocol::V04::TestBase
 
   def test_open_with_numeric_flag_should_accept_IO_constants
     @session.expects(:send_packet).with(FXP_OPEN, :long, 0,
-      :string, "/path/to/file",
-      :long, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES,
-      :long, FV5::CREATE_NEW,
-      :raw, attributes.new.to_s)
+                                        :string, "/path/to/file",
+                                        :long, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES,
+                                        :long, FV5::CREATE_NEW,
+                                        :raw, attributes.new.to_s)
 
     assert_equal 0, @base.open("/path/to/file", IO::RDWR | IO::CREAT | IO::EXCL, {})
   end
 
-  { "r"  => [FV5::OPEN_EXISTING, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES],
+  { "r" => [FV5::OPEN_EXISTING, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES],
     "rb" => [FV5::OPEN_EXISTING, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES],
     "r+" => [FV5::OPEN_EXISTING, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES],
-    "w"  => [FV5::CREATE_TRUNCATE, ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES],
+    "w" => [FV5::CREATE_TRUNCATE, ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES],
     "w+" => [FV5::CREATE_TRUNCATE, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES],
-    "a"  => [FV5::OPEN_OR_CREATE | FV5::APPEND_DATA, ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES | ACE::Mask::APPEND_DATA],
-    "a+" => [FV5::OPEN_OR_CREATE | FV5::APPEND_DATA, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES | ACE::Mask::APPEND_DATA]
-  }.each do |mode_string, (flags, access)|
-    define_method("test_open_with_#{mode_string.sub(/\+/, '_plus')}_should_translate_correctly") do
+    "a" => [FV5::OPEN_OR_CREATE | FV5::APPEND_DATA, ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES | ACE::Mask::APPEND_DATA],
+    "a+" => [FV5::OPEN_OR_CREATE | FV5::APPEND_DATA,
+             ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES | ACE::Mask::WRITE_DATA | ACE::Mask::WRITE_ATTRIBUTES |
+               ACE::Mask::APPEND_DATA] }.each do |mode_string, (flags, access)|
+    define_method("test_open_with_#{mode_string.sub("+", "_plus")}_should_translate_correctly") do
       @session.expects(:send_packet).with(FXP_OPEN, :long, 0,
-        :string, "/path/to/file", :long, access, :long, flags, :raw, attributes.new.to_s)
+                                          :string, "/path/to/file", :long, access, :long, flags, :raw, attributes.new.to_s)
 
       assert_equal 0, @base.open("/path/to/file", mode_string, {})
     end
@@ -49,9 +52,9 @@ class Protocol::V05::TestBase < Protocol::V04::TestBase
 
   def test_open_with_attributes_converts_hash_to_attribute_packet
     @session.expects(:send_packet).with(FXP_OPEN, :long, 0,
-      :string, "/path/to/file", :long, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES,
-      :long, FV5::OPEN_EXISTING, :raw, attributes.new(:permissions => 0755).to_s)
-    @base.open("/path/to/file", "r", :permissions => 0755)
+                                        :string, "/path/to/file", :long, ACE::Mask::READ_DATA | ACE::Mask::READ_ATTRIBUTES,
+                                        :long, FV5::OPEN_EXISTING, :raw, attributes.new(:permissions => 0o755).to_s)
+    @base.open("/path/to/file", "r", :permissions => 0o755)
   end
 
   private

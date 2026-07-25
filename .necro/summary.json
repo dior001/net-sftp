@@ -1,0 +1,23 @@
+{
+  "blocked": false,
+  "blocked_reason": null,
+  "dependency_changes": [
+    "bundler: removed unnecessary '~> 2.1' Gemfile pin (resolved against installed bundler 4.x)",
+    "rake: 12.0 -> 13.0",
+    "minitest: unbounded (>= 5) -> ~> 5.15 (pinned below the very-new 6.0 major)",
+    "mocha: unbounded (>= 0) -> ~> 3.1 (required for Ruby 4 keyword-argument matching fixes)",
+    "net-ssh: >= 5.0.0, < 8.0.0 (unchanged; already covers current 7.3.3)",
+    "added simplecov ~> 0.22 (dev) for coverage measurement",
+    "added rubocop, rubocop-minitest, rubocop-performance (dev) for linting",
+    "added bundler-audit (dev) for the security audit",
+    "replaced byebug with debug (dev) for a better-maintained Ruby 4-compatible debugger",
+    "removed codecov (dev, CI-only external upload service; simplecov's local report is sufficient)"
+  ],
+  "security_findings": [
+    "bundler-audit check against ruby-advisory-db: no vulnerabilities found in the resolved dependency set",
+    "manual review of all send/class_eval dynamic-dispatch call sites in lib/: all operate on hardcoded internal symbol sets, not user/network input; no injection risk found",
+    "brakeman not applicable: this is a plain Ruby library with no Rails dependency"
+  ],
+  "coverage_before": 95.22,
+  "coverage_after": 100.0
+}
