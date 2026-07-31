@@ -1,7 +1,8 @@
-require 'net/sftp/protocol/02/base'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/02/base"
 
 module Net; module SFTP; module Protocol; module V03
-
   # Wraps the low-level SFTP calls for version 3 of the SFTP protocol.
   #
   # None of these protocol methods block--all of them return immediately,
@@ -11,7 +12,6 @@ module Net; module SFTP; module Protocol; module V03
   # You will almost certainly never need to use this driver directly. Please
   # see Net::SFTP::Session for the recommended interface.
   class Base < V02::Base
-
     # Returns the protocol version implemented by this driver. (3, in this
     # case)
     def version
@@ -29,7 +29,5 @@ module Net; module SFTP; module Protocol; module V03
     def symlink(path, target)
       send_request(FXP_SYMLINK, :string, path, :string, target)
     end
-
   end
-
 end; end; end; end

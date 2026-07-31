@@ -1,8 +1,9 @@
-require 'net/sftp/protocol/05/base'
-require 'net/sftp/protocol/06/attributes'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/05/base"
+require "net/sftp/protocol/06/attributes"
 
 module Net; module SFTP; module Protocol; module V06
-
   # Wraps the low-level SFTP calls for version 6 of the SFTP protocol.
   #
   # None of these protocol methods block--all of them return immediately,
@@ -12,7 +13,6 @@ module Net; module SFTP; module Protocol; module V06
   # You will almost certainly never need to use this driver directly. Please
   # see Net::SFTP::Session for the recommended interface.
   class Base < V05::Base
-
     # Returns the protocol version implemented by this driver. (6, in this
     # case)
     def version
@@ -59,5 +59,4 @@ module Net; module SFTP; module Protocol; module V06
         V06::Attributes
       end
   end
-
 end; end; end; end

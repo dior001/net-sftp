@@ -1,8 +1,9 @@
-require 'net/ssh/loggable'
-require 'net/sftp/operations/file'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
+require "net/sftp/operations/file"
 
 module Net; module SFTP; module Operations
-
   # A factory class for opening files and returning Operations::File instances
   # that wrap the SFTP handles that represent them. This is a convenience
   # class for use when working with files synchronously. Rather than relying
@@ -36,19 +37,17 @@ module Net; module SFTP; module Operations
     #   sftp.file.open("/tmp/names.txt", "w") do |f|
     #     # ...
     #   end
-    def open(name, flags="r", mode=nil, &block)
+    def open(name, flags = "r", mode = nil, &)
       handle = sftp.open!(name, flags, :permissions => mode)
       file = Operations::File.new(sftp, handle)
 
-      if block_given?
+      return file unless block_given?
+
         begin
           yield file
         ensure
           file.close
         end
-      else
-        return file
-      end
     end
 
     # Returns +true+ if the argument refers to a directory on the remote host.
@@ -56,5 +55,4 @@ module Net; module SFTP; module Operations
       sftp.lstat!(path).directory?
     end
   end
-
 end; end; end

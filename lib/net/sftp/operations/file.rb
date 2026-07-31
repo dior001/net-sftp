@@ -1,7 +1,8 @@
-require 'net/ssh/loggable'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
 
 module Net; module SFTP; module Operations
-
   # A wrapper around an SFTP file handle, that exposes an IO-like interface
   # for interacting with the remote file. All operations are synchronous
   # (blocking), making this a very convenient way to deal with remote files.
@@ -30,14 +31,14 @@ module Net; module SFTP; module Operations
       @pos      = 0
       @real_pos = 0
       @real_eof = false
-      @buffer   = ""
+      @buffer   = +""
     end
 
     # Repositions the file pointer to the given offset (relative to the
     # start of the file). This will also reset the EOF flag.
     def pos=(offset)
       @real_pos = @pos = offset
-      @buffer = ""
+      @buffer = +""
       @real_eof = false
     end
 
@@ -62,20 +63,22 @@ module Net; module SFTP; module Operations
     # to the end of the file will be read and returned.
     #
     # This will advance the file pointer (#pos).
-    def read(n=nil)
+    def read(n = nil)
       loop do
         break if n && @buffer.length >= n
         break unless fill
       end
 
       if n
-        result, @buffer = @buffer[0,n], (@buffer[n..-1] || "")
+        result = @buffer[0, n]
+        @buffer = @buffer[n..] || ""
       else
-        result, @buffer = @buffer, ""
+        result = @buffer
+        @buffer = +""
       end
 
       @pos += result.length
-      return result
+      result
     end
 
     # Reads up to the next instance of +sep_string+ in the stream, and
@@ -84,7 +87,7 @@ module Net; module SFTP; module Operations
     # could be read, #gets will return +nil+. If the first argument is an
     # integer, or optional second argument is given, the returning string
     # would not be longer than the given value in bytes.
-    def gets(sep_or_limit=$/, limit=Float::INFINITY)
+    def gets(sep_or_limit = $/, limit = Float::INFINITY)
       if sep_or_limit.is_a? Integer
         sep_string = $/
         lim = sep_or_limit
@@ -93,7 +96,7 @@ module Net; module SFTP; module Operations
         lim = limit
       end
 
-      delim = if sep_string && sep_string.length == 0
+      delim = if sep_string && sep_string.empty?
         "#{$/}#{$/}"
       else
         sep_string
@@ -104,16 +107,20 @@ module Net; module SFTP; module Operations
         if at
           offset = [at + delim.length, lim].min
           @pos += offset
-          line, @buffer = @buffer[0,offset], @buffer[offset..-1]
+          line = @buffer[0, offset]
+          @buffer = @buffer[offset..]
           return line
         elsif lim < @buffer.length
           @pos += lim
-          line, @buffer = @buffer[0,lim], @buffer[lim..-1]
+          line = @buffer[0, lim]
+          @buffer = @buffer[lim..]
           return line
         elsif !fill
           return nil if @buffer.empty?
+
           @pos += @buffer.length
-          line, @buffer = @buffer, ""
+          line = @buffer
+          @buffer = +""
           return line
         end
       end
@@ -121,10 +128,11 @@ module Net; module SFTP; module Operations
 
     # Same as #gets, but raises EOFError if EOF is encountered before any
     # data could be read.
-    def readline(sep_or_limit=$/, limit=Float::INFINITY)
+    def readline(sep_or_limit = $/, limit = Float::INFINITY)
       line = gets(sep_or_limit, limit)
       raise EOFError if line.nil?
-      return line
+
+      line
     end
 
     # Writes the given data to the stream, incrementing the file position and
@@ -132,9 +140,9 @@ module Net; module SFTP; module Operations
     def write(data)
       data = data.to_s
       sftp.write!(handle, @real_pos, data)
-      @real_pos += data.bytes.length
+      @real_pos += data.bytesize
       @pos = @real_pos
-      data.bytes.length
+      data.bytesize
     end
 
     # Writes each argument to the stream. If +$\+ is set, it will be written
@@ -145,6 +153,8 @@ module Net; module SFTP; module Operations
       nil
     end
 
+    # Returns the size (in bytes) of the remote file, by performing an
+    # fstat operation on the handle (see #stat).
     def size
       stat.size
     end
@@ -158,11 +168,11 @@ module Net; module SFTP; module Operations
     # that does not already end in a newline. Array arguments are flattened.
     def puts(*items)
       items.each do |item|
-        if Array === item
+        if item.is_a?(Array)
           puts(*item)
         else
           write(item)
-          write("\n") unless item[-1] == ?\n
+          write("\n") unless item[-1] == "\n"
         end
       end
       nil
@@ -180,7 +190,7 @@ module Net; module SFTP; module Operations
 
       # Fills the buffer. Returns +true+ if it succeeded, and +false+ if
       # EOF was encountered before any data was read.
-      def fill
+      def fill # rubocop:disable Naming/PredicateMethod -- the boolean return is secondary to the buffer-filling side effect; this isn't a query method
         data = sftp.read!(handle, @real_pos, 8192)
 
         if data.nil?
@@ -194,5 +204,4 @@ module Net; module SFTP; module Operations
         !@real_eof
       end
   end
-
 end; end; end

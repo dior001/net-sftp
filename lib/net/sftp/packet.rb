@@ -1,7 +1,8 @@
-require 'net/ssh/buffer'
+# frozen_string_literal: true
+
+require "net/ssh/buffer"
 
 module Net; module SFTP
-
   # A specialization of the Net::SSH::Buffer class, which simply auto-reads
   # the type byte from the front of every packet it represents.
   class Packet < Net::SSH::Buffer
@@ -17,5 +18,4 @@ module Net; module SFTP
       @type = read_byte
     end
   end
-
 end; end

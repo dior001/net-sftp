@@ -1,7 +1,8 @@
-require 'net/ssh/buffer'
+# frozen_string_literal: true
+
+require "net/ssh/buffer"
 
 module Net; module SFTP; module Protocol; module V01
-
   # A class representing the attributes of a file or directory on the server.
   # It may be used to specify new attributes, or to query existing attributes.
   #
@@ -22,7 +23,6 @@ module Net; module SFTP; module Protocol; module V01
   # above attributes are exposed as methods (though not all will be set with
   # non-nil values from the server).
   class Attributes
-
     F_SIZE        = 0x00000001
     F_UIDGID      = 0x00000002
     F_PERMISSIONS = 0x00000004
@@ -39,10 +39,10 @@ module Net; module SFTP; module Protocol; module V01
     T_BLOCK_DEVICE = 8
     T_FIFO         = 9
 
-    class <<self
+    class << self
       # Returns the array of attribute meta-data that defines the structure of
       # the attributes packet as described by this version of the protocol.
-      def elements #:nodoc:
+      def elements # :nodoc:
         @elements ||= [
           [:size,                :int64,   F_SIZE],
           [:uid,                 :long,    F_UIDGID],
@@ -61,12 +61,12 @@ module Net; module SFTP; module Protocol; module V01
         data = {}
 
         elements.each do |name, type, condition|
-          if flags & condition == condition
-            if type == :special
-              data[name] = send("parse_#{name}", buffer)
-            else
-              data[name] = buffer.send("read_#{type}")
-            end
+          next unless flags & condition == condition
+
+          data[name] = if type == :special
+            send("parse_#{name}", buffer)
+          else
+            buffer.send("read_#{type}")
           end
         end
 
@@ -78,8 +78,11 @@ module Net; module SFTP; module Protocol; module V01
       # bad practice) because (1) I don't need any "regular" accessors, and
       # (2) because rdoc will automatically pick up and note methods defined
       # via attr_accessor.
-      def attr_accessor(name) #:nodoc:
-        class_eval <<-CODE
+      def attr_accessor(name) # :nodoc:
+        class_eval <<-CODE, __FILE__, __LINE__ + 1
+          # def size
+          #   attributes[:size]
+          # end
           def #{name}
             attributes[:#{name}]
           end
@@ -93,8 +96,11 @@ module Net; module SFTP; module Protocol; module V01
       # bad practice) because (1) I don't need any "regular" accessors, and
       # (2) because rdoc will automatically pick up and note methods defined
       # via attr_writer.
-      def attr_writer(name) #:nodoc:
-        class_eval <<-CODE
+      def attr_writer(name) # :nodoc:
+        class_eval <<-CODE, __FILE__, __LINE__ + 1
+          # def size=(value)
+          #   attributes[:size] = value
+          # end
           def #{name}=(value)
             attributes[:#{name}] = value
           end
@@ -105,7 +111,7 @@ module Net; module SFTP; module Protocol; module V01
 
         # Parse the hash of extended data from the buffer.
         def parse_extended(buffer)
-          extended = Hash.new
+          extended = {}
           buffer.read_long.times do
             extended[buffer.read_string] = buffer.read_string
           end
@@ -149,7 +155,7 @@ module Net; module SFTP; module Protocol; module V01
     # * :atime:: the access time of the file (integer, seconds since epoch)
     # * :mtime:: the modification time of the file (integer, seconds since epoch)
     # * :extended:: a hash of name/value pairs identifying extended info
-    def initialize(attributes={})
+    def initialize(attributes = {})
       @attributes = attributes
     end
 
@@ -159,7 +165,7 @@ module Net; module SFTP; module Protocol; module V01
     # This might fail on some systems (e.g., Windows).
     def uid
       if attributes[:owner] && !attributes.key?(:uid)
-        require 'etc'
+        require "etc"
         attributes[:uid] = Etc.getpwnam(attributes[:owner]).uid
       end
       attributes[:uid]
@@ -171,7 +177,7 @@ module Net; module SFTP; module Protocol; module V01
     # This might fail on some systems (e.g., Windows).
     def gid
       if attributes[:group] && !attributes.key?(:gid)
-        require 'etc'
+        require "etc"
         attributes[:gid] = Etc.getgrnam(attributes[:group]).gid
       end
       attributes[:gid]
@@ -183,7 +189,7 @@ module Net; module SFTP; module Protocol; module V01
     # fail on some systems (e.g. Windows).
     def owner
       if attributes[:uid] && !attributes[:owner]
-        require 'etc'
+        require "etc"
         attributes[:owner] = Etc.getpwuid(attributes[:uid].to_i).name
       end
       attributes[:owner]
@@ -195,7 +201,7 @@ module Net; module SFTP; module Protocol; module V01
     # fail on some systems (e.g. Windows).
     def group
       if attributes[:gid] && !attributes[:group]
-        require 'etc'
+        require "etc"
         attributes[:group] = Etc.getgrgid(attributes[:gid].to_i).name
       end
       attributes[:group]
@@ -204,19 +210,19 @@ module Net; module SFTP; module Protocol; module V01
     # Inspects the permissions bits to determine what type of entity this
     # attributes object represents. If will return one of the T_ constants.
     def type
-      if    permissions & 0140000 == 0140000 then 
+      if    permissions & 0o140000 == 0o140000
         T_SOCKET
-      elsif permissions & 0120000 == 0120000 then 
+      elsif permissions & 0o120000 == 0o120000
         T_SYMLINK
-      elsif permissions & 0100000 == 0100000 then
+      elsif permissions & 0o100000 == 0o100000
         T_REGULAR
-      elsif permissions &  060000 ==  060000 then
+      elsif permissions &  0o60000 ==  0o60000
         T_BLOCK_DEVICE
-      elsif permissions &  040000 ==  040000 then
+      elsif permissions &  0o40000 ==  0o40000
         T_DIRECTORY
-      elsif permissions &  020000 ==  020000 then
+      elsif permissions &  0o20000 ==  0o20000
         T_CHAR_DEVICE
-      elsif permissions &  010000 ==  010000 then
+      elsif permissions &  0o10000 ==  0o10000
         T_FIFO
       else
         T_UNKNOWN
@@ -275,7 +281,7 @@ module Net; module SFTP; module Protocol; module V01
 
       flags = 0
 
-      self.class.elements.each do |name, type, condition|
+      self.class.elements.each do |name, _type, condition|
         flags |= condition if attributes[name]
       end
 
@@ -307,9 +313,7 @@ module Net; module SFTP; module Protocol; module V01
       # buffer.
       def encode_extended(buffer)
         buffer.write_long extended.size
-        extended.each { |k,v| buffer.write_string k, v }
+        extended.each { |k, v| buffer.write_string k, v }
       end
-
   end
-
-end ; end ; end ; end
+end; end; end; end

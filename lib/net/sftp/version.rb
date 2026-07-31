@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Net
   module SFTP
     # A class for describing the current version of a library. The version
@@ -21,16 +23,20 @@ module Net
         new(major, minor, tiny, pre)
       end
 
+      # The major, minor, and tiny (patch) components of this version number.
       attr_reader :major, :minor, :tiny
 
       # Create a new Version object with the given components.
       def initialize(major, minor, tiny, pre = nil)
-        @major, @minor, @tiny, @pre = major, minor, tiny, pre
+        @major = major
+        @minor = minor
+        @tiny = tiny
+        @pre = pre
       end
 
       # Compare this version to the given +version+ object.
-      def <=>(version)
-        to_i <=> version.to_i
+      def <=>(other)
+        to_i <=> other.to_i
       end
 
       # Converts this version object to a string, where each of the three
@@ -42,7 +48,7 @@ module Net
       # Converts this version to a canonical integer that may be compared
       # against other version objects.
       def to_i
-        @to_i ||= @major * 1_000_000 + @minor * 1_000 + @tiny
+        @to_i ||= (@major * 1_000_000) + (@minor * 1_000) + @tiny
       end
 
       # The major component of this version of the Net::SFTP library

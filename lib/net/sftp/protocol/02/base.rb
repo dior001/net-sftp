@@ -1,7 +1,8 @@
-require 'net/sftp/protocol/01/base'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/01/base"
 
 module Net; module SFTP; module Protocol; module V02
-
   # Wraps the low-level SFTP calls for version 2 of the SFTP protocol.
   #
   # None of these protocol methods block--all of them return immediately,
@@ -11,7 +12,6 @@ module Net; module SFTP; module Protocol; module V02
   # You will almost certainly never need to use this driver directly. Please
   # see Net::SFTP::Session for the recommended interface.
   class Base < V01::Base
-
     # Returns the protocol version implemented by this driver. (2, in this
     # case)
     def version
@@ -22,10 +22,8 @@ module Net; module SFTP; module Protocol; module V02
     # directory with the given +name+ (must be a full path) be changed to
     # +new_name+ (which must also be a path). The +flags+ parameter is
     # ignored in this version of the protocol.
-    def rename(name, new_name, flags=nil)
+    def rename(name, new_name, _flags = nil)
       send_request(FXP_RENAME, :string, name, :string, new_name)
     end
-
   end
-
 end; end; end; end

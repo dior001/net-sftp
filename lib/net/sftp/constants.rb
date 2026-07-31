@@ -1,17 +1,17 @@
-module Net module SFTP
+# frozen_string_literal: true
 
+module Net; module SFTP
   # The packet types and other general constants used by the SFTP protocol.
   # See the specification for the SFTP protocol for a full discussion of their
   # meaning and usage.
   module Constants
-
     # The various packet types supported by SFTP protocol versions 1 through 6.
     # The FXP_EXTENDED and FXP_EXTENDED_REPLY packet types are not currently
     # understood by Net::SFTP.
     module PacketTypes
       FXP_INIT           = 1
       FXP_VERSION        = 2
-                         
+
       FXP_OPEN           = 3
       FXP_CLOSE          = 4
       FXP_READ           = 5
@@ -33,13 +33,13 @@ module Net module SFTP
       FXP_LINK           = 21
       FXP_BLOCK          = 22
       FXP_UNBLOCK        = 23
-                         
+
       FXP_STATUS         = 101
       FXP_HANDLE         = 102
       FXP_DATA           = 103
       FXP_NAME           = 104
       FXP_ATTRS          = 105
-                         
+
       FXP_EXTENDED       = 200
       FXP_EXTENDED_REPLY = 201
     end
@@ -73,7 +73,7 @@ module Net module SFTP
       FX_NO_SPACE_ON_FILESYSTEM = 14
       FX_QUOTA_EXCEEDED         = 15
       FX_UNKNOWN_PRINCIPLE      = 16
-      FX_LOCK_CONFlICT          = 17
+      FX_LOCK_CONFlICT          = 17 # rubocop:disable Naming/ConstantName -- kept as a historical typo (should be CONFLICT); renaming a public constant would break existing callers that reference it directly
       FX_DIR_NOT_EMPTY          = 18
       FX_NOT_A_DIRECTORY        = 19
       FX_INVALID_FILENAME       = 20
@@ -181,7 +181,5 @@ module Net module SFTP
         SYNCHRONIZE       = 0x00100000
       end
     end
-
   end
-
 end end

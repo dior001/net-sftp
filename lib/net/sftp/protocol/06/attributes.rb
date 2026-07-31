@@ -1,7 +1,8 @@
-require 'net/sftp/protocol/04/attributes'
+# frozen_string_literal: true
+
+require "net/sftp/protocol/04/attributes"
 
 module Net; module SFTP; module Protocol; module V06
-
   # A class representing the attributes of a file or directory on the server.
   # It may be used to specify new attributes, or to query existing attributes.
   # This particular class is specific to versions 6 and higher of the SFTP
@@ -49,7 +50,7 @@ module Net; module SFTP; module Protocol; module V06
 
     # The array of elements that describe this structure, in order. Used when
     # parsing and serializing attribute objects.
-    def self.elements #:nodoc:
+    def self.elements # :nodoc:
       @elements ||= [
         [:type,                :byte,    0],
         [:size,                :int64,   F_SIZE],
@@ -103,5 +104,4 @@ module Net; module SFTP; module Protocol; module V06
     # The value of the file name before filename translation was attempted
     attr_accessor :untranslated_name
   end
-
 end; end; end; end

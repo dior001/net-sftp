@@ -1,5 +1,6 @@
-module Net; module SFTP; module Protocol; module V04
+# frozen_string_literal: true
 
+module Net; module SFTP; module Protocol; module V04
   # Represents a single named item on the remote server. This includes the
   # name, and attributes about the item, and the "longname".
   #
@@ -8,15 +9,19 @@ module Net; module SFTP; module Protocol; module V04
   # method, which returns a string that can be used to display this item in
   # a directory listing.
   class Name
-    # The name of the item on the remote server.
-    attr_reader :name
+    # The name of the item on the remote server. Writable so that
+    # Net::SFTP::Operations::Dir#glob can rewrite it to a path relative to
+    # the directory it started searching from, as it descends into
+    # subdirectories.
+    attr_accessor :name
 
     # Attributes instance describing this item.
     attr_reader :attributes
 
     # Create a new Name object with the given name and attributes.
     def initialize(name, attributes)
-      @name, @attributes = name, attributes
+      @name = name
+      @attributes = attributes
     end
 
     # Returns +true+ if the item is a directory.
@@ -38,7 +43,7 @@ module Net; module SFTP; module Protocol; module V04
     # used by the unix "ls" utility.
     def longname
       @longname ||= begin
-        longname = if directory?
+        type = if directory?
           "d"
         elsif symlink?
           "l"
@@ -46,22 +51,26 @@ module Net; module SFTP; module Protocol; module V04
           "-"
         end
 
-        longname << (attributes.permissions & 0400 != 0 ? "r" : "-")
-        longname << (attributes.permissions & 0200 != 0 ? "w" : "-")
-        longname << (attributes.permissions & 0100 != 0 ? "x" : "-")
-        longname << (attributes.permissions & 0040 != 0 ? "r" : "-")
-        longname << (attributes.permissions & 0020 != 0 ? "w" : "-")
-        longname << (attributes.permissions & 0010 != 0 ? "x" : "-")
-        longname << (attributes.permissions & 0004 != 0 ? "r" : "-")
-        longname << (attributes.permissions & 0002 != 0 ? "w" : "-")
-        longname << (attributes.permissions & 0001 != 0 ? "x" : "-")
+        permissions = [
+          (attributes.permissions.nobits?(0o400) ? "-" : "r"),
+          (attributes.permissions.nobits?(0o200) ? "-" : "w"),
+          (attributes.permissions.nobits?(0o100) ? "-" : "x"),
+          (attributes.permissions.nobits?(0o040) ? "-" : "r"),
+          (attributes.permissions.nobits?(0o020) ? "-" : "w"),
+          (attributes.permissions.nobits?(0o010) ? "-" : "x"),
+          (attributes.permissions.nobits?(0o004) ? "-" : "r"),
+          (attributes.permissions.nobits?(0o002) ? "-" : "w"),
+          (attributes.permissions.nobits?(0o001) ? "-" : "x")
+        ].join
 
-        longname << (" %-8s %-8s %8d " % [attributes.owner, attributes.group, attributes.size])
-
-        longname << Time.at(attributes.mtime).strftime("%b %e %H:%M ")
-        longname << name
+        [
+          type,
+          permissions,
+          format(" %<owner>-8s %<group>-8s %<size>8d ", owner: attributes.owner, group: attributes.group, size: attributes.size),
+          Time.at(attributes.mtime).strftime("%b %e %H:%M "),
+          name
+        ].join
       end
     end
   end
-
 end; end; end; end

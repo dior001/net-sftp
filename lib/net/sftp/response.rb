@@ -1,7 +1,8 @@
-require 'net/sftp/constants'
+# frozen_string_literal: true
+
+require "net/sftp/constants"
 
 module Net; module SFTP
-
   # Encapsulates a response from the remote server, to a specific client
   # request. Response objects are passed as parameters to callbacks when you
   # are performing asynchronous operations; when you call Net::SFTP::Request#wait,
@@ -31,9 +32,11 @@ module Net; module SFTP
     # Create a new Response object for the given Net::SFTP::Request instance,
     # and with the given data. If there is no :code key in the data, the
     # code is assumed to be FX_OK.
-    def initialize(request, data={}) #:nodoc:
-      @request, @data = request, data
-      @code, @message = data[:code] || FX_OK, data[:message]
+    def initialize(request, data = {}) # :nodoc:
+      @request = request
+      @data = data
+      @code = data[:code] || FX_OK
+      @message = data[:message]
     end
 
     # Retrieve the data item with the given +key+. The key is converted to a
@@ -52,7 +55,7 @@ module Net; module SFTP
       end
     end
 
-    alias :to_str :to_s
+    alias to_str to_s
 
     # Returns +true+ if the status code is FX_OK; +false+ otherwise.
     def ok?
@@ -65,12 +68,11 @@ module Net; module SFTP
     end
 
     #--
-    MAP = constants.inject({}) do |memo, name|
+    MAP = constants.each_with_object({}) do |name, memo|
       next memo unless name =~ /^FX_(.*)/
-      memo[const_get(name)] = $1.downcase.tr("_", " ")
-      memo
+
+      memo[const_get(name)] = ::Regexp.last_match(1).downcase.tr("_", " ")
     end
     #++
   end
-
 end; end

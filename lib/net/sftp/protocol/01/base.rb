@@ -1,12 +1,13 @@
-require 'net/ssh/loggable'
-require 'net/sftp/constants'
-require 'net/sftp/packet'
-require 'net/sftp/protocol/base'
-require 'net/sftp/protocol/01/attributes'
-require 'net/sftp/protocol/01/name'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
+require "net/sftp/constants"
+require "net/sftp/packet"
+require "net/sftp/protocol/base"
+require "net/sftp/protocol/01/attributes"
+require "net/sftp/protocol/01/name"
 
 module Net; module SFTP; module Protocol; module V01
-
   # Wraps the low-level SFTP calls for version 1 of the SFTP protocol. Also
   # implements the packet parsing as defined by version 1 of the protocol.
   #
@@ -73,12 +74,12 @@ module Net; module SFTP; module Protocol; module V01
     def open(path, flags, options)
       flags = normalize_open_flags(flags)
 
-      if flags & (IO::WRONLY | IO::RDWR) != 0
+      if flags.nobits?(IO::WRONLY | IO::RDWR)
+        sftp_flags = FV1::READ
+      else
         sftp_flags = FV1::WRITE
         sftp_flags |= FV1::READ if flags & IO::RDWR != 0
         sftp_flags |= FV1::APPEND if flags & IO::APPEND != 0
-      else
-        sftp_flags = FV1::READ
       end
 
       sftp_flags |= FV1::CREAT if flags & IO::CREAT != 0
@@ -116,7 +117,7 @@ module Net; module SFTP; module Protocol; module V01
     # for the file at the given remote +path+ (a string). The +flags+ parameter
     # is ignored in this version of the protocol. #lstat will not follow
     # symbolic links; see #stat for a version that will.
-    def lstat(path, flags=nil)
+    def lstat(path, _flags = nil)
       send_request(FXP_LSTAT, :string, path)
     end
 
@@ -124,7 +125,7 @@ module Net; module SFTP; module Protocol; module V01
     # for the file represented by the given +handle+ (which must have been
     # obtained from a FXP_HANDLE packet). The +flags+ parameter is ignored in
     # this version of the protocol.
-    def fstat(handle, flags=nil)
+    def fstat(handle, _flags = nil)
       send_request(FXP_FSTAT, :string, handle)
     end
 
@@ -185,43 +186,43 @@ module Net; module SFTP; module Protocol; module V01
     # for the file at the given remote +path+ (a string). The +flags+ parameter
     # is ignored in this version of the protocol. #stat will follow
     # symbolic links; see #lstat for a version that will not.
-    def stat(path, flags=nil)
+    def stat(path, _flags = nil)
       send_request(FXP_STAT, :string, path)
     end
 
     # Not implemented in version 1 of the SFTP protocol. Raises a
     # NotImplementedError if called.
-    def rename(name, new_name, flags=nil)
+    def rename(_name, _new_name, _flags = nil)
       not_implemented! :rename
     end
 
     # Not implemented in version 1 of the SFTP protocol. Raises a
     # NotImplementedError if called.
-    def readlink(path)
+    def readlink(_path)
       not_implemented! :readlink
     end
 
     # Not implemented in version 1 of the SFTP protocol. Raises a
     # NotImplementedError if called.
-    def symlink(path, target)
+    def symlink(_path, _target)
       not_implemented! :symlink
     end
 
     # Not implemented in version 1 of the SFTP protocol. Raises a
     # NotImplementedError if called.
-    def link(*args)
+    def link(*_args)
       not_implemented! :link
     end
 
     # Not implemented in version 1 of the SFTP protocol. Raises a
     # NotImplementedError if called.
-    def block(handle, offset, length, mask)
+    def block(_handle, _offset, _length, _mask)
       not_implemented! :block
     end
 
     # Not implemented in version 1 of the SFTP protocol. Raises a
     # NotImplementedError if called.
-    def unblock(handle, offset, length)
+    def unblock(_handle, _offset, _length)
       not_implemented! :unblock
     end
 
@@ -231,13 +232,14 @@ module Net; module SFTP; module Protocol; module V01
       # not implemented by the current SFTP protocol version. Simply raises
       # NotImplementedError with a message based on the given operation name.
       def not_implemented!(operation)
-        raise NotImplementedError, "the #{operation} operation is not available in the version of the SFTP protocol supported by your server"
+        raise NotImplementedError,
+              "the #{operation} operation is not available in the version of the SFTP protocol supported by your server"
       end
 
       # Normalizes the given flags parameter, converting it into a combination
       # of IO constants.
       def normalize_open_flags(flags)
-        if String === flags
+        if flags.is_a?(String)
           case flags.tr("b", "")
           when "r"  then IO::RDONLY
           when "r+" then IO::RDWR
@@ -264,5 +266,4 @@ module Net; module SFTP; module Protocol; module V01
         V01::Name
       end
   end
-
 end; end; end; end

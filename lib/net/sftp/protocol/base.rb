@@ -1,8 +1,9 @@
-require 'net/ssh/loggable'
-require 'net/sftp/constants'
+# frozen_string_literal: true
+
+require "net/ssh/loggable"
+require "net/sftp/constants"
 
 module Net; module SFTP; module Protocol
-
   # The abstract superclass of the specific implementations for each supported
   # SFTP protocol version. It implements general packet parsing logic, and
   # provides a way for subclasses to send requests.
@@ -43,8 +44,7 @@ module Net; module SFTP; module Protocol
       def send_request(type, *args)
         @request_id_counter += 1
         session.send_packet(type, :long, @request_id_counter, *args)
-        return @request_id_counter
+        @request_id_counter
       end
   end
-
 end; end; end
