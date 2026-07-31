@@ -61,12 +61,13 @@ For the full documentation, start with Net::SFTP::Session. Also see Net::SFTP::O
 
 == REQUIREMENTS:
 
-* Net::SSH 2
+* Ruby 3.1 or newer
+* Net::SSH >= 5.0, < 8.0
 
 If you wish to run the tests, you'll need:
 
-* Echoe (if you want to use the Rakefile)
-* Mocha
+* Bundler (<tt>bundle install</tt> will pull in Minitest, Mocha, RuboCop,
+  SimpleCov, and the other development dependencies listed in the gemspec)
 
 == INSTALL:
 
@@ -85,12 +86,12 @@ Then, when install the gem, do so with high security:
 
 If you don't add the public key, you'll see an error like "Couldn't verify data signature". If you're still having trouble let me know and I'll give you a hand.
 
-Or, if you prefer to do it the hard way (sans Rubygems):
+== DEVELOPMENT:
 
-* tar xzf net-ssh-*.tgz
-* cd net-ssh-*
-* ruby setup.rb config
-* ruby setup.rb install (might need sudo privileges)
+    $ bundle install
+    $ bundle exec rake test    # run the test suite
+    $ bundle exec rubocop      # run the linter
+    $ bundle exec bundle-audit # check dependencies for known vulnerabilities
 
 == LICENSE:
 
