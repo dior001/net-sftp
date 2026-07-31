@@ -1,15 +1,13 @@
 source 'https://rubygems.org'
 
-# Specify your gem's dependencies in mygem.gemspec
+# Specify your gem's dependencies in net-sftp.gemspec
 gemspec
 
-# TODO: add to gemspec
-gem "bundler", "~> 2.1"
-gem "rake", "~> 12.0"
+gem 'debug', group: %i[development test], require: false if !Gem.win_platform? && RUBY_ENGINE == "ruby"
 
-gem 'byebug', group: %i[development test] if !Gem.win_platform? && RUBY_ENGINE == "ruby"
-
-if ENV["CI"]
-  gem 'codecov', require: false, group: :test
-  gem 'simplecov', require: false, group: :test
+group :development, :test do
+  gem 'rubocop', require: false
+  gem 'rubocop-minitest', require: false
+  gem 'rubocop-performance', require: false
+  gem 'bundler-audit', require: false
 end
