@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "common"
 
 class UploadTest < Net::SFTP::TestCase
@@ -8,6 +10,16 @@ class UploadTest < Net::SFTP::TestCase
   def test_upload_file_should_send_file_contents
     expect_file_transfer("/path/to/local", "/path/to/remote", "here are the contents")
     assert_scripted_command { sftp.upload("/path/to/local", "/path/to/remote") }
+  end
+
+  def test_upload_bang_should_block_until_transfer_completes
+    expect_file_transfer("/path/to/local", "/path/to/remote", "here are the contents")
+
+    result = nil
+    assert_scripted_command { result = sftp.upload!("/path/to/local", "/path/to/remote") }
+
+    assert_instance_of Net::SFTP::Operations::Upload, result
+    refute_predicate result, :active?
   end
 
   def test_upload_file_without_remote_uses_filename_of_local_file
@@ -52,16 +64,16 @@ class UploadTest < Net::SFTP::TestCase
     assert_no_more_reported_events
   end
 
-  def test_upload_file_should_read_chunks_of_size(requested_size=nil)
+  def test_upload_file_should_read_chunks_of_size(requested_size = nil)
     size = requested_size || Net::SFTP::Operations::Upload::DEFAULT_READ_SIZE
     expect_sftp_session :server_version => 3 do |channel|
       channel.sends_packet(FXP_OPEN, :long, 0, :string, "/path/to/remote", :long, 0x1A, :long, 0)
       channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
       channel.sends_packet(FXP_WRITE, :long, 1, :string, "handle", :int64, 0, :string, "a" * size)
       channel.sends_packet(FXP_WRITE, :long, 2, :string, "handle", :int64, size, :string, "b" * size)
-      channel.sends_packet(FXP_WRITE, :long, 3, :string, "handle", :int64, size*2, :string, "c" * size)
+      channel.sends_packet(FXP_WRITE, :long, 3, :string, "handle", :int64, size * 2, :string, "c" * size)
       channel.gets_packet(FXP_STATUS, :long, 1, :long, 0)
-      channel.sends_packet(FXP_WRITE, :long, 4, :string, "handle", :int64, size*3, :string, "d" * size)
+      channel.sends_packet(FXP_WRITE, :long, 4, :string, "handle", :int64, size * 3, :string, "d" * size)
       channel.gets_packet(FXP_STATUS, :long, 2, :long, 0)
       channel.sends_packet(FXP_CLOSE, :long, 5, :string, "handle")
       channel.gets_packet(FXP_STATUS, :long, 3, :long, 0)
@@ -69,7 +81,7 @@ class UploadTest < Net::SFTP::TestCase
       channel.gets_packet(FXP_STATUS, :long, 5, :long, 0)
     end
 
-    expect_file("/path/to/local", "a" * size + "b" * size + "c" * size + "d" * size)
+    expect_file("/path/to/local", ("a" * size) + ("b" * size) + ("c" * size) + ("d" * size))
 
     assert_scripted_command do
       opts = {}
@@ -89,8 +101,8 @@ class UploadTest < Net::SFTP::TestCase
       channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
       channel.sends_packet(FXP_WRITE, :long, 1, :string, "handle", :int64, 0, :string, "a" * size)
       channel.sends_packet(FXP_WRITE, :long, 2, :string, "handle", :int64, size, :string, "b" * size)
-      channel.sends_packet(FXP_WRITE, :long, 3, :string, "handle", :int64, size*2, :string, "c" * size)
-      channel.sends_packet(FXP_WRITE, :long, 4, :string, "handle", :int64, size*3, :string, "d" * size)
+      channel.sends_packet(FXP_WRITE, :long, 3, :string, "handle", :int64, size * 2, :string, "c" * size)
+      channel.sends_packet(FXP_WRITE, :long, 4, :string, "handle", :int64, size * 3, :string, "d" * size)
       channel.gets_packet(FXP_STATUS, :long, 1, :long, 0)
       channel.sends_packet(FXP_CLOSE, :long, 5, :string, "handle")
       channel.gets_packet(FXP_STATUS, :long, 2, :long, 0)
@@ -99,7 +111,7 @@ class UploadTest < Net::SFTP::TestCase
       channel.gets_packet(FXP_STATUS, :long, 5, :long, 0)
     end
 
-    expect_file("/path/to/local", "a" * size + "b" * size + "c" * size + "d" * size)
+    expect_file("/path/to/local", ("a" * size) + ("b" * size) + ("c" * size) + ("d" * size))
 
     assert_scripted_command do
       sftp.upload("/path/to/local", "/path/to/remote", :requests => 3)
@@ -111,6 +123,38 @@ class UploadTest < Net::SFTP::TestCase
 
     assert_scripted_command do
       sftp.upload("/path/to/local", "/path/to/remote", :mkdir => true)
+    end
+  end
+
+  def test_upload_directory_should_raise_status_exception_when_subdirectory_mkdir_fails
+    File.stubs(:directory?).with("/path/to/local").returns(true)
+    Dir.stubs(:entries).with("/path/to/local").returns(%w(. .. subdir))
+    File.stubs(:directory?).with("/path/to/local/subdir").returns(true)
+    Dir.stubs(:entries).with("/path/to/local/subdir").returns(%w(. ..))
+
+    expect_sftp_session :server_version => 3 do |ch|
+      ch.sends_packet(FXP_MKDIR, :long, 0, :string, "/path/to/remote", :long, 0)
+      ch.gets_packet(FXP_STATUS, :long, 0, :long, 0)
+      ch.sends_packet(FXP_MKDIR, :long, 1, :string, "/path/to/remote/subdir", :long, 0)
+      ch.gets_packet(FXP_STATUS, :long, 1, :long, 4)
+    end
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.upload("/path/to/local", "/path/to/remote", :mkdir => true) }
+    end
+  end
+
+  def test_upload_directory_should_raise_status_exception_when_mkdir_fails
+    File.stubs(:directory?).with("/path/to/local").returns(true)
+    Dir.stubs(:entries).with("/path/to/local").returns(%w(. ..))
+
+    expect_sftp_session :server_version => 3 do |ch|
+      ch.sends_packet(FXP_MKDIR, :long, 0, :string, "/path/to/remote", :long, 0)
+      ch.gets_packet(FXP_STATUS, :long, 0, :long, 4)
+    end
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.upload("/path/to/local", "/path/to/remote", :mkdir => true) }
     end
   end
 
@@ -141,6 +185,61 @@ class UploadTest < Net::SFTP::TestCase
     assert_no_more_reported_events
   end
 
+  def test_upload_file_should_raise_status_exception_when_open_fails
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPEN, :long, 0, :string, "/path/to/remote", :long, 0x1A, :long, 0)
+      channel.gets_packet(FXP_STATUS, :long, 0, :long, 4)
+    end
+    expect_file("/path/to/local", "here are the contents")
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.upload("/path/to/local", "/path/to/remote") }
+    end
+  end
+
+  def test_upload_file_should_raise_status_exception_when_write_fails
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPEN, :long, 0, :string, "/path/to/remote", :long, 0x1A, :long, 0)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
+      channel.sends_packet(FXP_WRITE, :long, 1, :string, "handle", :int64, 0, :string, "here are the contents")
+      channel.sends_packet(FXP_CLOSE, :long, 2, :string, "handle")
+      channel.gets_packet(FXP_STATUS, :long, 1, :long, 4)
+    end
+    expect_file("/path/to/local", "here are the contents")
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.upload("/path/to/local", "/path/to/remote") }
+    end
+  end
+
+  def test_upload_file_should_raise_status_exception_when_close_fails
+    expect_sftp_session :server_version => 3 do |channel|
+      channel.sends_packet(FXP_OPEN, :long, 0, :string, "/path/to/remote", :long, 0x1A, :long, 0)
+      channel.gets_packet(FXP_HANDLE, :long, 0, :string, "handle")
+      channel.sends_packet(FXP_WRITE, :long, 1, :string, "handle", :int64, 0, :string, "here are the contents")
+      channel.sends_packet(FXP_CLOSE, :long, 2, :string, "handle")
+      channel.gets_packet(FXP_STATUS, :long, 1, :long, 0)
+      channel.gets_packet(FXP_STATUS, :long, 2, :long, 4)
+    end
+    expect_file("/path/to/local", "here are the contents")
+
+    assert_raises(Net::SFTP::StatusException) do
+      assert_scripted_command { sftp.upload("/path/to/local", "/path/to/remote") }
+    end
+  end
+
+  def test_upload_should_raise_argument_error_when_local_file_does_not_exist
+    File.stubs(:directory?).with("/path/to/missing").returns(false)
+    File.stubs(:exist?).with("/path/to/missing").returns(false)
+
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+
+    assert_raises(ArgumentError) do
+      Net::SFTP::Operations::Upload.new(sftp, "/path/to/missing", "/path/to/remote")
+    end
+  end
+
   def test_upload_io_should_send_io_as_file
     expect_sftp_session :server_version => 3 do |channel|
       channel.sends_packet(FXP_OPEN, :long, 0, :string, "/path/to/remote", :long, 0x1A, :long, 0)
@@ -154,6 +253,61 @@ class UploadTest < Net::SFTP::TestCase
     assert_scripted_command do
       sftp.upload(StringIO.new("this is some text"), "/path/to/remote")
     end
+  end
+
+  def test_recursive_upload_without_mkdir_option_should_not_create_remote_directory
+    File.stubs(:directory?).with("/path/to/local").returns(true)
+    Dir.stubs(:entries).with("/path/to/local").returns(%w(. .. file1))
+    expect_file("/path/to/local/file1", "contents of file1")
+
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    sftp.expects(:mkdir).never
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote/file1", "w").returns(request)
+
+    uploader = Net::SFTP::Operations::Upload.new(sftp, "/path/to/local", "/path/to/remote")
+    assert_predicate uploader, :recursive?
+  end
+
+  def test_abort_bang_should_clear_active_state_and_pending_uploads
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote", "w").returns(request)
+
+    uploader = Net::SFTP::Operations::Upload.new(sftp, StringIO.new("data"), "/path/to/remote")
+    assert_predicate uploader, :active?
+
+    uploader.abort!
+    refute_predicate uploader, :active?
+  end
+
+  def test_wait_should_run_the_sftp_event_loop_until_finished
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote", "w").returns(request)
+    sftp.expects(:loop)
+
+    uploader = Net::SFTP::Operations::Upload.new(sftp, StringIO.new("data"), "/path/to/remote")
+    assert_equal uploader, uploader.wait
+  end
+
+  def test_property_accessors_should_read_and_write_named_properties
+    sftp = mock("sftp")
+    sftp.expects(:logger).returns(nil)
+    request = stub("request")
+    request.stubs(:[]=)
+    sftp.expects(:open).with("/path/to/remote", "w").returns(request)
+
+    uploader = Net::SFTP::Operations::Upload.new(sftp, StringIO.new("data"), "/path/to/remote")
+    assert_nil uploader[:foo]
+    uploader[:foo] = "bar"
+    assert_equal "bar", uploader[:foo]
   end
 
   private

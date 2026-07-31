@@ -1,21 +1,23 @@
-require 'common'
+# frozen_string_literal: true
+
+require "common"
 
 class RequestTest < Net::SFTP::TestCase
   def test_property_setter_should_symbolize_key
     request = Net::SFTP::Request.new(stub("session"), :open, 1)
     request["key"] = :value
-    assert_equal :value, request['key']
+    assert_equal :value, request["key"]
     assert_equal :value, request[:key]
     assert_equal :value, request.properties[:key]
-    assert_nil request.properties['key']
+    assert_nil request.properties["key"]
   end
 
   def test_pending_should_query_pending_requests_of_session
-    session = stub("session", :pending_requests => {1 => true})
+    session = stub("session", :pending_requests => { 1 => true })
     request = Net::SFTP::Request.new(session, :open, 1)
-    assert request.pending?
+    assert_predicate request, :pending?
     request = Net::SFTP::Request.new(session, :open, 2)
-    assert !request.pending?
+    refute_predicate request, :pending?
   end
 
   def test_wait_should_run_loop_while_pending_and_return_self
@@ -52,8 +54,6 @@ class RequestTest < Net::SFTP::TestCase
     assert called
   end
 
-  private
-
     class MockSession
       attr_reader :loops
 
@@ -62,7 +62,7 @@ class RequestTest < Net::SFTP::TestCase
       end
 
       def loop
-        while true
+        Kernel.loop do
           @loops += 1
           break unless yield
         end

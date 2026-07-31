@@ -1,5 +1,7 @@
-require 'common'
-require 'protocol/05/test_base'
+# frozen_string_literal: true
+
+require "common"
+require "protocol/05/test_base"
 
 class Protocol::V06::TestBase < Protocol::V05::TestBase
   include Net::SFTP::Constants::OpenFlags

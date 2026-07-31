@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 require "common"
 
 class FileFactoryTest < Net::SFTP::TestCase
   def setup
-    @sftp = stub('sftp')
+    @sftp = stub("sftp")
     @factory = Net::SFTP::Operations::FileFactory.new(@sftp)
   end
 
@@ -24,7 +26,7 @@ class FileFactoryTest < Net::SFTP::TestCase
     @sftp.expects(:close!).with("handle")
 
     assert_raises(RuntimeError) do
-      @factory.open("/path/to/remote") { |f| raise RuntimeError, "b00m" }
+      @factory.open("/path/to/remote") { |_f| raise "b00m" }
     end
   end
 
@@ -37,12 +39,12 @@ class FileFactoryTest < Net::SFTP::TestCase
   end
 
   def test_directory_should_be_true_for_directory
-    @sftp.expects(:lstat!).with("/path/to/dir").returns(mock('attrs', :directory? => true))
+    @sftp.expects(:lstat!).with("/path/to/dir").returns(mock("attrs", :directory? => true))
     assert @factory.directory?("/path/to/dir")
   end
 
   def test_directory_should_be_false_for_non_directory
-    @sftp.expects(:lstat!).with("/path/to/file").returns(mock('attrs', :directory? => false))
-    assert !@factory.directory?("/path/to/file")
+    @sftp.expects(:lstat!).with("/path/to/file").returns(mock("attrs", :directory? => false))
+    refute @factory.directory?("/path/to/file")
   end
 end

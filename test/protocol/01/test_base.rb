@@ -1,4 +1,6 @@
-require 'common'
+# frozen_string_literal: true
+
+require "common"
 
 # NOTE: these tests assume that the interface to Net::SFTP::Session#send_packet
 # will remain constant. If that interface ever changes, these tests will need
@@ -10,7 +12,7 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
   include Net::SFTP::Constants::OpenFlags
 
   def setup
-    @session = stub('session', :logger => nil)
+    @session = stub("session", :logger => nil)
     @base = driver.new(@session)
   end
 
@@ -40,8 +42,8 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
 
   def test_parse_name_packet_should_use_correct_name_class
     packet = Net::SSH::Buffer.from(:long, 2,
-      :string, "name1", :string, "long1", :long, 0x4, :long, 0755,
-      :string, "name2", :string, "long2", :long, 0x4, :long, 0550)
+                                   :string, "name1", :string, "long1", :long, 0x4, :long, 0o755,
+                                   :string, "name2", :string, "long2", :long, 0x4, :long, 0o550)
     names = @base.parse_name_packet(packet)[:names]
 
     refute_nil names
@@ -50,34 +52,33 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
 
     assert_equal "name1", names.first.name
     assert_equal "long1", names.first.longname
-    assert_equal 0755, names.first.attributes.permissions
+    assert_equal 0o755, names.first.attributes.permissions
 
     assert_equal "name2", names.last.name
     assert_equal "long2", names.last.longname
-    assert_equal 0550, names.last.attributes.permissions
+    assert_equal 0o550, names.last.attributes.permissions
   end
 
   def test_open_with_numeric_flag_should_accept_IO_constants
     @session.expects(:send_packet).with(FXP_OPEN, :long, 0,
-      :string, "/path/to/file",
-      :long, FV1::READ | FV1::WRITE | FV1::CREAT | FV1::EXCL,
-      :raw, attributes.new.to_s)
+                                        :string, "/path/to/file",
+                                        :long, FV1::READ | FV1::WRITE | FV1::CREAT | FV1::EXCL,
+                                        :raw, attributes.new.to_s)
 
     assert_equal 0, @base.open("/path/to/file", IO::RDWR | IO::CREAT | IO::EXCL, {})
   end
 
-  { "r"  => FV1::READ,
+  { "r" => FV1::READ,
     "rb" => FV1::READ,
     "r+" => FV1::READ | FV1::WRITE,
-    "w"  => FV1::WRITE | FV1::TRUNC | FV1::CREAT,
+    "w" => FV1::WRITE | FV1::TRUNC | FV1::CREAT,
     "w+" => FV1::WRITE | FV1::READ | FV1::TRUNC | FV1::CREAT,
-    "a"  => FV1::APPEND | FV1::WRITE | FV1::CREAT,
-    "a+" => FV1::APPEND | FV1::WRITE | FV1::READ | FV1::CREAT
-  }.each do |flags, options|
-    safe_name = flags.sub(/\+/, "_plus")
+    "a" => FV1::APPEND | FV1::WRITE | FV1::CREAT,
+    "a+" => FV1::APPEND | FV1::WRITE | FV1::READ | FV1::CREAT }.each do |flags, options|
+    safe_name = flags.sub("+", "_plus")
     define_method("test_open_with_#{safe_name}_should_translate_correctly") do
       @session.expects(:send_packet).with(FXP_OPEN, :long, 0,
-        :string, "/path/to/file", :long, options, :raw, attributes.new.to_s)
+                                          :string, "/path/to/file", :long, options, :raw, attributes.new.to_s)
 
       assert_equal 0, @base.open("/path/to/file", flags, {})
     end
@@ -85,8 +86,9 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
 
   def test_open_with_attributes_converts_hash_to_attribute_packet
     @session.expects(:send_packet).with(FXP_OPEN, :long, 0,
-      :string, "/path/to/file", :long, FV1::READ, :raw, attributes.new(:permissions => 0755).to_s)
-    @base.open("/path/to/file", "r", :permissions => 0755)
+                                        :string, "/path/to/file", :long, FV1::READ, :raw,
+                                        attributes.new(:permissions => 0o755).to_s)
+    @base.open("/path/to/file", "r", :permissions => 0o755)
   end
 
   def test_close_should_send_close_packet
@@ -125,13 +127,15 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
   end
 
   def test_setstat_should_translate_hash_to_attributes_and_send_setstat_packet
-    @session.expects(:send_packet).with(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :raw, attributes.new(:atime => 1, :mtime => 2, :permissions => 0755).to_s)
-    assert_equal 0, @base.setstat("/path/to/file", :atime => 1, :mtime => 2, :permissions => 0755)
+    @session.expects(:send_packet).with(FXP_SETSTAT, :long, 0, :string, "/path/to/file", :raw,
+                                        attributes.new(:atime => 1, :mtime => 2, :permissions => 0o755).to_s)
+    assert_equal 0, @base.setstat("/path/to/file", :atime => 1, :mtime => 2, :permissions => 0o755)
   end
 
   def test_fsetstat_should_translate_hash_to_attributes_and_send_fsetstat_packet
-    @session.expects(:send_packet).with(FXP_FSETSTAT, :long, 0, :string, "handle", :raw, attributes.new(:atime => 1, :mtime => 2, :permissions => 0755).to_s)
-    assert_equal 0, @base.fsetstat("handle", :atime => 1, :mtime => 2, :permissions => 0755)
+    @session.expects(:send_packet).with(FXP_FSETSTAT, :long, 0, :string, "handle", :raw,
+                                        attributes.new(:atime => 1, :mtime => 2, :permissions => 0o755).to_s)
+    assert_equal 0, @base.fsetstat("handle", :atime => 1, :mtime => 2, :permissions => 0o755)
   end
 
   def test_opendir_should_send_opendir_packet
@@ -150,8 +154,9 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
   end
 
   def test_mkdir_should_translate_hash_to_attributes_and_send_mkdir_packet
-    @session.expects(:send_packet).with(FXP_MKDIR, :long, 0, :string, "/path/to/dir", :raw, attributes.new(:atime => 1, :mtime => 2, :permissions => 0755).to_s)
-    assert_equal 0, @base.mkdir("/path/to/dir", :atime => 1, :mtime => 2, :permissions => 0755)
+    @session.expects(:send_packet).with(FXP_MKDIR, :long, 0, :string, "/path/to/dir", :raw,
+                                        attributes.new(:atime => 1, :mtime => 2, :permissions => 0o755).to_s)
+    assert_equal 0, @base.mkdir("/path/to/dir", :atime => 1, :mtime => 2, :permissions => 0o755)
   end
 
   def test_rmdir_should_send_rmdir_packet
@@ -196,6 +201,10 @@ class Protocol::V01::TestBase < Net::SFTP::TestCase
 
   def test_unblock_should_raise_not_implemented_error
     assert_raises(NotImplementedError) { @base.unblock("handle", 100, 200) }
+  end
+
+  def test_open_with_unsupported_flag_string_should_raise_argument_error
+    assert_raises(ArgumentError) { @base.open("/path/to/file", "x", {}) }
   end
 
   private

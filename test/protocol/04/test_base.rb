@@ -1,5 +1,7 @@
-require 'common'
-require 'protocol/03/test_base'
+# frozen_string_literal: true
+
+require "common"
+require "protocol/03/test_base"
 
 class Protocol::V04::TestBase < Protocol::V03::TestBase
   def test_version
@@ -13,8 +15,8 @@ class Protocol::V04::TestBase < Protocol::V03::TestBase
 
   def test_parse_name_packet_should_use_correct_name_class
     packet = Net::SSH::Buffer.from(:long, 2,
-      :string, "name1", :long, 0x4, :byte, 1, :long, 0755,
-      :string, "name2", :long, 0x4, :byte, 1, :long, 0550)
+                                   :string, "name1", :long, 0x4, :byte, 1, :long, 0o755,
+                                   :string, "name2", :long, 0x4, :byte, 1, :long, 0o550)
     names = @base.parse_name_packet(packet)[:names]
 
     refute_nil names
@@ -22,10 +24,10 @@ class Protocol::V04::TestBase < Protocol::V03::TestBase
     assert_instance_of Net::SFTP::Protocol::V04::Name, names.first
 
     assert_equal "name1", names.first.name
-    assert_equal 0755, names.first.attributes.permissions
+    assert_equal 0o755, names.first.attributes.permissions
 
     assert_equal "name2", names.last.name
-    assert_equal 0550, names.last.attributes.permissions
+    assert_equal 0o550, names.last.attributes.permissions
   end
 
   undef test_fstat_should_ignore_flags_parameter
